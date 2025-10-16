@@ -6,6 +6,11 @@
     <title>Registro de Asistencia</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         * { font-family: 'Poppins', sans-serif; }
         
@@ -55,7 +60,7 @@
             <h1 class="text-4xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
                 Registro de Asistencia
             </h1>
-            <p id="aulaInfo" class="text-gray-600 font-semibold text-lg"></p>
+            <p id="aulaInfo" class="text-gray-600 font-semibold text-lg">Cargando...</p>
         </div>
 
         <!-- Formulario -->
@@ -126,6 +131,21 @@
     <div id="toast" class="hidden fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-md mx-auto sm:mx-0"></div>
 
     <script>
+      const firebaseConfig = {
+  apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
+  authDomain: "macroqr-9cee8.firebaseapp.com",
+  databaseURL: "https://macroqr-9cee8-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "macroqr-9cee8",
+  storageBucket: "macroqr-9cee8.firebasestorage.app",
+  messagingSenderId: "751611795247",
+  appId: "1:751611795247:web:c28b92b31ded4fdd5cb3da",
+  measurementId: "G-WR5H7L26DH"
+};
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         let aulaId = null;
         let aulaInfo = null;
 
@@ -164,18 +184,24 @@
                 return;
             }
 
-            // Obtener información del aula desde localStorage del profesor
-            const aulas = JSON.parse(localStorage.getItem('aulas_profesor')) || [];
-            aulaInfo = aulas.find(a => a.id === aulaId);
-            
-            if (aulaInfo) {
-                document.getElementById('aulaInfo').textContent = aulaInfo.nombre;
-            } else {
-                document.getElementById('aulaInfo').textContent = `Aula: ${aulaId}`;
-            }
+            // Obtener información del aula desde Firebase
+            database.ref('aulas/' + aulaId).once('value').then((snapshot) => {
+                aulaInfo = snapshot.val();
+                
+                if (aulaInfo) {
+                    document.getElementById('aulaInfo').textContent = aulaInfo.nombre;
+                } else {
+                    document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
+                    mostrarMensaje('❌ Aula no encontrada', 'error');
+                }
+            }).catch((error) => {
+                console.error('Error al cargar el aula:', error);
+                document.getElementById('aulaInfo').textContent = 'Error al cargar';
+                mostrarMensaje('❌ Error al conectar con el servidor', 'error');
+            });
         }
 
-        function registrarAsistencia() {
+        async function registrarAsistencia() {
             const numeroControl = document.getElementById('numeroControl').value.trim();
             const nombreCompleto = document.getElementById('nombreCompleto').value.trim();
 
@@ -189,65 +215,69 @@
                 return;
             }
 
-            // Obtener datos actuales del profesor
-            const aulas = JSON.parse(localStorage.getItem('aulas_profesor')) || [];
-            const alumnosRegistrados = JSON.parse(localStorage.getItem('alumnos_profesor')) || {};
-            const asistencias = JSON.parse(localStorage.getItem('asistencias_profesor')) || {};
+            try {
+                // Verificar si el aula existe
+                const aulaSnapshot = await database.ref('aulas/' + aulaId).once('value');
+                const aula = aulaSnapshot.val();
+                
+                if (!aula) {
+                    mostrarMensaje('❌ Aula no encontrada', 'error');
+                    return;
+                }
 
-            // Buscar aula por ID
-            const aula = aulas.find(a => a.id === aulaId);
-            
-            if (!aula) {
-                mostrarMensaje('❌ Aula no encontrada. Asegúrate de estar en la misma red que el profesor.', 'error');
-                return;
-            }
+                // Obtener alumnos registrados
+                const alumnosSnapshot = await database.ref('alumnos/' + aulaId).once('value');
+                let alumnosAula = alumnosSnapshot.val() || [];
+                
+                // Verificar si el alumno ya está registrado en el aula
+                let alumno = alumnosAula.find(a => a.numeroControl === numeroControl);
 
-            // Verificar si el alumno ya está registrado en esta aula
-            const alumnosAula = alumnosRegistrados[aula.id] || [];
-            let alumno = alumnosAula.find(a => a.numeroControl === numeroControl);
+                // Si no está registrado, agregarlo
+                if (!alumno) {
+                    alumno = {
+                        numeroControl: numeroControl,
+                        nombre: nombreCompleto
+                    };
+                    alumnosAula.push(alumno);
+                    await database.ref('alumnos/' + aulaId).set(alumnosAula);
+                }
 
-            // Si no está registrado, agregarlo automáticamente
-            if (!alumno) {
-                alumno = {
+                // Verificar si ya registró asistencia hoy
+                const asistenciasSnapshot = await database.ref('asistencias/' + aulaId).once('value');
+                let registrosAula = asistenciasSnapshot.val() || [];
+                const fechaHoy = new Date().toLocaleDateString('es-MX');
+                
+                const yaRegistrado = registrosAula.some(
+                    r => r.numeroControl === numeroControl && r.fecha === fechaHoy
+                );
+
+                if (yaRegistrado) {
+                    mostrarMensaje('ℹ️ Ya registraste tu asistencia hoy en esta clase', 'error');
+                    return;
+                }
+
+                // Registrar asistencia
+                const ahora = new Date();
+                const registro = {
                     numeroControl: numeroControl,
-                    nombre: nombreCompleto
+                    nombre: nombreCompleto,
+                    fecha: fechaHoy,
+                    hora: ahora.toLocaleTimeString('es-MX'),
+                    aula: aula.nombre
                 };
-                alumnosAula.push(alumno);
-                alumnosRegistrados[aula.id] = alumnosAula;
-                localStorage.setItem('alumnos_profesor', JSON.stringify(alumnosRegistrados));
+
+                registrosAula.push(registro);
+                await database.ref('asistencias/' + aulaId).set(registrosAula);
+
+                // Mostrar mensaje de éxito
+                document.getElementById('formulario').classList.add('hidden');
+                document.getElementById('exitoMensaje').classList.remove('hidden');
+                
+                mostrarMensaje(`🎉 ¡Bienvenido ${nombreCompleto}!`, 'success');
+            } catch (error) {
+                console.error('Error al registrar asistencia:', error);
+                mostrarMensaje('❌ Error al registrar asistencia. Intenta de nuevo.', 'error');
             }
-
-            // Verificar si ya registró asistencia hoy
-            const registrosAula = asistencias[aula.id] || [];
-            const fechaHoy = new Date().toLocaleDateString('es-MX');
-            const yaRegistrado = registrosAula.some(
-                r => r.numeroControl === numeroControl && r.fecha === fechaHoy
-            );
-
-            if (yaRegistrado) {
-                mostrarMensaje('ℹ️ Ya registraste tu asistencia hoy en esta clase', 'error');
-                return;
-            }
-
-            // Registrar asistencia
-            const ahora = new Date();
-            const registro = {
-                numeroControl: numeroControl,
-                nombre: nombreCompleto,
-                fecha: fechaHoy,
-                hora: ahora.toLocaleTimeString('es-MX'),
-                aula: aula.nombre
-            };
-
-            registrosAula.push(registro);
-            asistencias[aula.id] = registrosAula;
-            localStorage.setItem('asistencias_profesor', JSON.stringify(asistencias));
-
-            // Mostrar mensaje de éxito
-            document.getElementById('formulario').classList.add('hidden');
-            document.getElementById('exitoMensaje').classList.remove('hidden');
-            
-            mostrarMensaje(`🎉 ¡Bienvenido ${nombreCompleto}!`, 'success');
         }
 
         // Cargar información al iniciar

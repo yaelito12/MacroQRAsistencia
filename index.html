@@ -6,6 +6,11 @@
     <title>Profesor - Sistema de Asistencia QR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         * { font-family: 'Poppins', sans-serif; }
         
@@ -126,19 +131,29 @@
     <div id="toast" class="hidden fixed top-4 right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-sm"></div>
 
     <script>
-        // URL de la página del alumno en GitHub Pages
-        const URL_ALUMNO = 'https://yaelito12.github.io/alumnosmqr/';
+        // ⚠️ REEMPLAZA ESTA CONFIGURACIÓN CON LA TUYA DE FIREBASE
+   const firebaseConfig = {
+  apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
+  authDomain: "macroqr-9cee8.firebaseapp.com",
+  databaseURL: "https://macroqr-9cee8-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "macroqr-9cee8",
+  storageBucket: "macroqr-9cee8.firebasestorage.app",
+  messagingSenderId: "751611795247",
+  appId: "1:751611795247:web:c28b92b31ded4fdd5cb3da",
+  measurementId: "G-WR5H7L26DH"
+};
 
-        let aulas = JSON.parse(localStorage.getItem('aulas_profesor')) || [];
-        let asistencias = JSON.parse(localStorage.getItem('asistencias_profesor')) || {};
-        let alumnosRegistrados = JSON.parse(localStorage.getItem('alumnos_profesor')) || {};
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // URL de la página del alumno
+        const URL_ALUMNO = 'https://yaelito12.github.io/alumnosmqr/alumno.html';
+
+        let aulas = {};
+        let asistencias = {};
+        let alumnosRegistrados = {};
         let aulaSeleccionada = null;
-
-        function guardarDatos() {
-            localStorage.setItem('aulas_profesor', JSON.stringify(aulas));
-            localStorage.setItem('asistencias_profesor', JSON.stringify(asistencias));
-            localStorage.setItem('alumnos_profesor', JSON.stringify(alumnosRegistrados));
-        }
 
         function mostrarMensaje(texto, tipo) {
             const toast = document.getElementById('toast');
@@ -170,11 +185,10 @@
                 nombre: nombre
             };
 
-            aulas.push(nuevaAula);
-            asistencias[nuevaAula.id] = [];
-            alumnosRegistrados[nuevaAula.id] = [];
-            guardarDatos();
-            renderizarAulas();
+            database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
+            database.ref('asistencias/' + nuevaAula.id).set([]);
+            database.ref('alumnos/' + nuevaAula.id).set([]);
+            
             mostrarMensaje('Aula creada exitosamente', 'success');
         }
 
@@ -185,7 +199,7 @@
 
         function abrirModalAlumnos(aulaId) {
             aulaSeleccionada = aulaId;
-            const aula = aulas.find(a => a.id === aulaId);
+            const aula = aulas[aulaId];
             document.getElementById('modalTitle').textContent = `${aula.nombre}`;
             document.getElementById('modalAlumnos').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
@@ -202,12 +216,10 @@
         function eliminarAlumno(numeroControl) {
             if (!confirm('¿Eliminar este alumno?')) return;
             
-            alumnosRegistrados[aulaSeleccionada] = alumnosRegistrados[aulaSeleccionada].filter(
-                a => a.numeroControl !== numeroControl
-            );
-            guardarDatos();
-            renderizarAlumnos();
-            renderizarAulas();
+            const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
+            const alumnosActualizados = alumnosAula.filter(a => a.numeroControl !== numeroControl);
+            
+            database.ref('alumnos/' + aulaSeleccionada).set(alumnosActualizados);
             mostrarMensaje('Alumno eliminado', 'success');
         }
 
@@ -251,7 +263,7 @@
         }
 
         function exportarExcel(aulaId) {
-            const aula = aulas.find(a => a.id === aulaId);
+            const aula = aulas[aulaId];
             const registros = asistencias[aulaId] || [];
 
             if (registros.length === 0) {
@@ -278,14 +290,13 @@
         }
 
         function eliminarAula(aulaId) {
-            const aula = aulas.find(a => a.id === aulaId);
+            const aula = aulas[aulaId];
             if (!confirm(`¿Eliminar el aula "${aula.nombre}"?`)) return;
             
-            aulas = aulas.filter(a => a.id !== aulaId);
-            delete asistencias[aulaId];
-            delete alumnosRegistrados[aulaId];
-            guardarDatos();
-            renderizarAulas();
+            database.ref('aulas/' + aulaId).remove();
+            database.ref('asistencias/' + aulaId).remove();
+            database.ref('alumnos/' + aulaId).remove();
+            
             mostrarMensaje('Aula eliminada', 'success');
         }
 
@@ -300,8 +311,9 @@
 
         function renderizarAulas() {
             const container = document.getElementById('aulasContainer');
+            const aulasArray = Object.values(aulas);
             
-            if (aulas.length === 0) {
+            if (aulasArray.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full card-glass rounded-3xl shadow-2xl p-8 sm:p-12 text-center animate-fade-in">
                         <div class="text-7xl sm:text-8xl mb-6">📚</div>
@@ -312,9 +324,10 @@
                 return;
             }
 
-            container.innerHTML = aulas.map((aula, index) => {
+            container.innerHTML = aulasArray.map((aula, index) => {
                 const alumnosAula = alumnosRegistrados[aula.id] || [];
-                const asistenciasHoy = (asistencias[aula.id] || []).filter(
+                const asistenciasAula = asistencias[aula.id] || [];
+                const asistenciasHoy = asistenciasAula.filter(
                     a => a.fecha === new Date().toLocaleDateString('es-MX')
                 );
 
@@ -388,12 +401,24 @@
             }).join('');
         }
 
-        // Actualizar cada 10 segundos
-        setInterval(() => {
+        // Escuchar cambios en Firebase en tiempo real
+        database.ref('aulas').on('value', (snapshot) => {
+            aulas = snapshot.val() || {};
             renderizarAulas();
-        }, 10000);
+        });
 
-        renderizarAulas();
+        database.ref('asistencias').on('value', (snapshot) => {
+            asistencias = snapshot.val() || {};
+            renderizarAulas();
+        });
+
+        database.ref('alumnos').on('value', (snapshot) => {
+            alumnosRegistrados = snapshot.val() || {};
+            if (aulaSeleccionada) {
+                renderizarAlumnos();
+            }
+            renderizarAulas();
+        });
     </script>
 </body>
 </html>
