@@ -131,20 +131,29 @@
     <div id="toast" class="hidden fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-md mx-auto sm:mx-0"></div>
 
     <script>
-      const firebaseConfig = {
-  apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
-  authDomain: "macroqr-9cee8.firebaseapp.com",
-  databaseURL: "https://macroqr-9cee8-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "macroqr-9cee8",
-  storageBucket: "macroqr-9cee8.firebasestorage.app",
-  messagingSenderId: "751611795247",
-  appId: "1:751611795247:web:c28b92b31ded4fdd5cb3da",
-  measurementId: "G-WR5H7L26DH"
-};
+        const firebaseConfig = {
+            apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
+            authDomain: "macroqr-9cee8.firebaseapp.com",
+            databaseURL: "https://macroqr-9cee8-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "macroqr-9cee8",
+            storageBucket: "macroqr-9cee8.firebasestorage.app",
+            messagingSenderId: "751611795247",
+            appId: "1:751611795247:web:c28b92b31ded4fdd5cb3da",
+            measurementId: "G-WR5H7L26DH"
+        };
 
         // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        let firebaseApp;
+        let database;
+        
+        try {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            console.log('✅ Firebase inicializado correctamente');
+        } catch (error) {
+            console.error('❌ Error al inicializar Firebase:', error);
+            mostrarMensaje('Error al conectar con el servidor. Verifica tu conexión.', 'error');
+        }
 
         let aulaId = null;
         let aulaInfo = null;
@@ -178,6 +187,8 @@
         function cargarInfoAula() {
             aulaId = obtenerParametroURL('aula');
             
+            console.log('🔍 Aula ID obtenida:', aulaId);
+            
             if (!aulaId) {
                 mostrarMensaje('❌ Código de aula no válido', 'error');
                 document.getElementById('aulaInfo').textContent = 'Escanea un código QR válido';
@@ -185,20 +196,23 @@
             }
 
             // Obtener información del aula desde Firebase
-            database.ref('aulas/' + aulaId).once('value').then((snapshot) => {
-                aulaInfo = snapshot.val();
-                
-                if (aulaInfo) {
-                    document.getElementById('aulaInfo').textContent = aulaInfo.nombre;
-                } else {
-                    document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
-                    mostrarMensaje('❌ Aula no encontrada', 'error');
-                }
-            }).catch((error) => {
-                console.error('Error al cargar el aula:', error);
-                document.getElementById('aulaInfo').textContent = 'Error al cargar';
-                mostrarMensaje('❌ Error al conectar con el servidor', 'error');
-            });
+            database.ref('aulas/' + aulaId).once('value')
+                .then((snapshot) => {
+                    aulaInfo = snapshot.val();
+                    console.log('📚 Información del aula:', aulaInfo);
+                    
+                    if (aulaInfo) {
+                        document.getElementById('aulaInfo').textContent = aulaInfo.nombre;
+                    } else {
+                        document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
+                        mostrarMensaje('❌ Aula no encontrada', 'error');
+                    }
+                })
+                .catch((error) => {
+                    console.error('❌ Error al cargar el aula:', error);
+                    document.getElementById('aulaInfo').textContent = 'Error al cargar';
+                    mostrarMensaje('❌ Error al conectar con el servidor', 'error');
+                });
         }
 
         async function registrarAsistencia() {
@@ -216,6 +230,8 @@
             }
 
             try {
+                console.log('📝 Registrando asistencia para:', numeroControl);
+                
                 // Verificar si el aula existe
                 const aulaSnapshot = await database.ref('aulas/' + aulaId).once('value');
                 const aula = aulaSnapshot.val();
@@ -240,6 +256,7 @@
                     };
                     alumnosAula.push(alumno);
                     await database.ref('alumnos/' + aulaId).set(alumnosAula);
+                    console.log('✅ Alumno agregado a la lista');
                 }
 
                 // Verificar si ya registró asistencia hoy
@@ -269,19 +286,24 @@
                 registrosAula.push(registro);
                 await database.ref('asistencias/' + aulaId).set(registrosAula);
 
+                console.log('✅ Asistencia registrada exitosamente');
+
                 // Mostrar mensaje de éxito
                 document.getElementById('formulario').classList.add('hidden');
                 document.getElementById('exitoMensaje').classList.remove('hidden');
                 
                 mostrarMensaje(`🎉 ¡Bienvenido ${nombreCompleto}!`, 'success');
             } catch (error) {
-                console.error('Error al registrar asistencia:', error);
+                console.error('❌ Error al registrar asistencia:', error);
                 mostrarMensaje('❌ Error al registrar asistencia. Intenta de nuevo.', 'error');
             }
         }
 
         // Cargar información al iniciar
-        window.addEventListener('load', cargarInfoAula);
+        window.addEventListener('load', () => {
+            console.log('🚀 Página cargada');
+            cargarInfoAula();
+        });
     </script>
 </body>
 </html>
