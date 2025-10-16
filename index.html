@@ -7,24 +7,56 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDK (compat) -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
     <style>
         * { font-family: 'Poppins', sans-serif; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
         .animate-fade-in { animation: fadeIn 0.5s ease-out; }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
         .hover-lift { transition: all 0.3s ease; }
         .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .card-glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
-        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); transition: all 0.3s ease; }
-        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4); }
-        .qr-container { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
-        @media (max-width: 768px) { h1 { font-size: 1.75rem !important; } }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        
+        .card-glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .qr-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 1.75rem !important; }
+        }
     </style>
 </head>
 <body class="gradient-bg min-h-screen py-4 sm:py-8">
@@ -58,7 +90,7 @@
         <div id="aulasContainer" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"></div>
     </div>
 
-    <!-- Modal Alumnos -->
+    <!-- Modal para gestionar alumnos -->
     <div id="modalAlumnos" class="hidden fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-in">
             <div class="gradient-bg text-white p-6 sm:p-8 flex justify-between items-center">
@@ -81,7 +113,7 @@
                     </div>
                 </div>
 
-                <!-- Lista -->
+                <!-- Lista de alumnos -->
                 <div class="bg-gray-50 rounded-2xl p-4 sm:p-6">
                     <h4 class="font-bold text-lg sm:text-xl text-gray-800 mb-4 flex items-center gap-2">
                         <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,270 +128,298 @@
         </div>
     </div>
 
-    <!-- Toast -->
+    <!-- Toast de mensajes -->
     <div id="toast" class="hidden fixed top-4 right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-sm"></div>
 
     <script>
+       
    const firebaseConfig = {
-      apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
-      authDomain: "macroqr-9cee8.firebaseapp.com",
-      databaseURL: "https://macroqr-9cee8-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "macroqr-9cee8",
-      storageBucket: "macroqr-9cee8.firebasestorage.app",
-      messagingSenderId: "751611795247",
-      appId: "1:751611795247:web:c28b92b31ded4fdd5cb3da",
-      measurementId: "G-WR5H7L26DH"
-    };
+  apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
+  authDomain: "macroqr-9cee8.firebaseapp.com",
+  databaseURL: "https://macroqr-9cee8-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "macroqr-9cee8",
+  storageBucket: "macroqr-9cee8.firebasestorage.app",
+  messagingSenderId: "751611795247",
+  appId: "1:751611795247:web:c28b92b31ded4fdd5cb3da",
+  measurementId: "G-WR5H7L26DH"
+};
 
-    // Inicializar Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
-    // URL pública de la página del alumno (ajústala si cambias hosting/ruta)
-    const URL_ALUMNO = 'https://yaelito12.github.io/MacroQRAsistencia/alumno.html';
+        // URL de la página del alumno
+       const URL_ALUMNO = 'https://yaelito12.github.io/MacroQRAsistencia/alumno.html';
 
-    let aulas = {};
-    let asistencias = {};
-    let alumnosRegistrados = {};
-    let aulaSeleccionada = null;
+        let aulas = {};
+        let asistencias = {};
+        let alumnosRegistrados = {};
+        let aulaSeleccionada = null;
 
-    function mostrarMensaje(texto, tipo) {
-      const toast = document.getElementById('toast');
-      toast.innerHTML = `
-        <div class="flex items-center gap-3">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            ${tipo === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
-              tipo === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'}
-          </svg>
-          <span>${texto}</span>
-        </div>`;
-      toast.className = `fixed top-4 right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-sm animate-fade-in ${
-        tipo === 'success' ? 'bg-gradient-to-r from-green-500 to-emerald-600' :
-        tipo === 'error'   ? 'bg-gradient-to-r from-red-500 to-pink-600' :
-                             'bg-gradient-to-r from-blue-500 to-indigo-600'
-      }`;
-      toast.classList.remove('hidden');
-      setTimeout(() => toast.classList.add('hidden'), 4000);
-    }
-
-    // ==== NUEVO: generar sessionId diario por aula ====
-    function buildSessionId(aulaId){
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
-      return `${aulaId}-${yyyy}${mm}${dd}`; // p.ej. 3A-20251016
-    }
-
-    function crearAula() {
-      const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
-      if (!nombre) return;
-
-      const nuevaAula = { id: Date.now().toString(), nombre };
-      database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
-      database.ref('asistencias/' + nuevaAula.id).set([]);
-      database.ref('alumnos/' + nuevaAula.id).set([]);
-      mostrarMensaje('Aula creada exitosamente', 'success');
-    }
-
-    // ==== ACTUALIZADO: QR con aula + sid (diario) ====
-    function generarQRCode(aulaId) {
-      const sid = buildSessionId(aulaId);
-      const urlCompleta = `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}`;
-      return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(urlCompleta)}&bgcolor=ffffff&color=4c1d95&margin=20`;
-    }
-
-    function abrirModalAlumnos(aulaId) {
-      aulaSeleccionada = aulaId;
-      const aula = aulas[aulaId];
-      document.getElementById('modalTitle').textContent = `${aula.nombre}`;
-      document.getElementById('modalAlumnos').classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-      renderizarAlumnos();
-    }
-
-    function cerrarModal() {
-      document.getElementById('modalAlumnos').classList.add('hidden');
-      document.body.style.overflow = 'auto';
-      document.getElementById('buscarAlumno').value = '';
-      aulaSeleccionada = null;
-    }
-
-    function eliminarAlumno(numeroControl) {
-      if (!confirm('¿Eliminar este alumno?')) return;
-      const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
-      const alumnosActualizados = alumnosAula.filter(a => a.numeroControl !== numeroControl);
-      database.ref('alumnos/' + aulaSeleccionada).set(alumnosActualizados);
-      mostrarMensaje('Alumno eliminado', 'success');
-    }
-
-    function filtrarAlumnos() { renderizarAlumnos(); }
-
-    function renderizarAlumnos() {
-      const buscar = document.getElementById('buscarAlumno').value.toLowerCase();
-      const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
-      const alumnosFiltrados = alumnosAula.filter(a => 
-        a.nombre.toLowerCase().includes(buscar) || a.numeroControl.includes(buscar)
-      );
-
-      document.getElementById('contadorAlumnos').textContent = alumnosFiltrados.length;
-      const lista = document.getElementById('listaAlumnos');
-
-      if (alumnosFiltrados.length === 0) {
-        lista.innerHTML = '<p class="text-center text-gray-500 py-8 text-lg">No hay alumnos registrados aún</p>';
-        return;
-      }
-
-      lista.innerHTML = alumnosFiltrados.map(alumno => `
-        <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-md hover:shadow-lg transition-all border border-gray-100">
-          <div class="flex items-center gap-3">
-            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg">
-              ${alumno.nombre.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p class="font-bold text-gray-800 text-base">${alumno.nombre}</p>
-              <p class="text-sm text-gray-600 font-medium">${alumno.numeroControl}</p>
-            </div>
-          </div>
-          <button onclick="eliminarAlumno('${alumno.numeroControl}')" class="bg-red-500 text-white p-3 rounded-xl hover:bg-red-600 transition-all">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-          </button>
-        </div>
-      `).join('');
-    }
-
-    function exportarExcel(aulaId) {
-      const aula = aulas[aulaId];
-      const registros = asistencias[aulaId] || [];
-      if (registros.length === 0) { mostrarMensaje('No hay registros para exportar', 'error'); return; }
-
-      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora\n';
-      registros.forEach(r => { csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${r.hora}\n`; });
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `Asistencia_${aula.nombre.replace(/\s/g, '_')}_${new Date().toLocaleDateString('es-MX').replace(/\//g, '-')}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      mostrarMensaje('Archivo descargado exitosamente', 'success');
-    }
-
-    function eliminarAula(aulaId) {
-      const aula = aulas[aulaId];
-      if (!confirm(`¿Eliminar el aula "${aula.nombre}"?`)) return;
-      database.ref('aulas/' + aulaId).remove();
-      database.ref('asistencias/' + aulaId).remove();
-      database.ref('alumnos/' + aulaId).remove();
-      mostrarMensaje('Aula eliminada', 'success');
-    }
-
-    function copiarURL(aulaId) {
-      const sid = buildSessionId(aulaId);
-      const urlCompleta = `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}`;
-      navigator.clipboard.writeText(urlCompleta)
-        .then(() => mostrarMensaje('URL copiada al portapapeles', 'success'))
-        .catch(()  => mostrarMensaje('No se pudo copiar la URL', 'error'));
-    }
-
-    function renderizarAulas() {
-      const container = document.getElementById('aulasContainer');
-      const aulasArray = Object.values(aulas);
-      if (aulasArray.length === 0) {
-        container.innerHTML = `
-          <div class="col-span-full card-glass rounded-3xl shadow-2xl p-8 sm:p-12 text-center animate-fade-in">
-            <div class="text-7xl sm:text-8xl mb-6">📚</div>
-            <p class="text-gray-700 text-xl sm:text-2xl font-bold mb-2">No hay aulas creadas</p>
-            <p class="text-gray-500 text-base sm:text-lg">Crea tu primera aula para comenzar</p>
-          </div>`;
-        return;
-      }
-
-      container.innerHTML = aulasArray.map((aula, index) => {
-        const alumnosAula = alumnosRegistrados[aula.id] || [];
-        const asistenciasAula = asistencias[aula.id] || [];
-        const asistenciasHoy = asistenciasAula.filter(a => a.fecha === new Date().toLocaleDateString('es-MX'));
-        return `
-          <div class="card-glass rounded-3xl shadow-xl p-4 sm:p-6 relative hover-lift animate-fade-in" style="animation-delay:${index*0.1}s">
-            <button onclick="eliminarAula('${aula.id}')" class="absolute top-3 right-3 bg-red-500 text-white p-2 rounded-xl hover:bg-red-600 transition-all shadow-lg z-10">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-            </button>
-            <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 pr-10">${aula.nombre}</h3>
-            <div class="qr-container rounded-2xl p-4 sm:p-6 mb-4 shadow-inner">
-              <img src="${generarQRCode(aula.id)}" alt="QR Code" class="w-48 sm:w-64 h-48 sm:h-64 mx-auto mb-3 rounded-xl shadow-lg">
-              <p class="text-center text-xs text-gray-600 font-semibold mb-2">Los alumnos escanean este QR (incluye aula y sesión de hoy)</p>
-              <button onclick="copiarURL('${aula.id}')" class="w-full bg-white text-indigo-600 py-2 px-3 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                </svg>
-                Copiar URL
-              </button>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 mb-4">
-              <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
-                <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Alumnos</p>
-                <p class="text-2xl sm:text-3xl font-bold">${alumnosAula.length}</p>
-              </div>
-              <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
-                <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Hoy</p>
-                <p class="text-2xl sm:text-3xl font-bold">${asistenciasHoy.length}</p>
-              </div>
-            </div>
-
-            ${asistenciasHoy.length > 0 ? `
-              <div class="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border border-green-200">
-                <p class="font-bold text-gray-700 mb-2 text-sm sm:text-base flex items-center gap-2">
-                  <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  Últimas asistencias:
-                </p>
-                <div class="space-y-2 max-h-32 overflow-y-auto">
-                  ${asistenciasHoy.slice(-5).reverse().map(reg => `
-                    <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
-                      <span class="font-semibold text-gray-800">${reg.nombre}</span>
-                      <span class="text-gray-600">${reg.hora}</span>
-                    </div>
-                  `).join('')}
+        function mostrarMensaje(texto, tipo) {
+            const toast = document.getElementById('toast');
+            toast.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        ${tipo === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
+                          tipo === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
+                          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'}
+                    </svg>
+                    <span>${texto}</span>
                 </div>
-              </div>
-            ` : ''}
+            `;
+            toast.className = `fixed top-4 right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-sm animate-fade-in ${
+                tipo === 'success' ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 
+                tipo === 'error' ? 'bg-gradient-to-r from-red-500 to-pink-600' : 
+                'bg-gradient-to-r from-blue-500 to-indigo-600'
+            }`;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 4000);
+        }
 
-            <div class="grid grid-cols-2 gap-3">
-              <button onclick="abrirModalAlumnos('${aula.id}')" class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl hover:shadow-xl font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                </svg>
-                Alumnos
-              </button>
-              <button onclick="exportarExcel('${aula.id}')" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl hover:shadow-xl font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                Excel
-              </button>
-            </div>
-          </div>`;
-      }).join('');
-    }
+        function crearAula() {
+            const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
+            if (!nombre) return;
 
-    // Suscripciones
-    database.ref('aulas').on('value', (s) => { aulas = s.val() || {}; renderizarAulas(); });
-    database.ref('asistencias').on('value', (s) => { asistencias = s.val() || {}; renderizarAulas(); });
-    database.ref('alumnos').on('value', (s) => {
-      alumnosRegistrados = s.val() || {};
-      if (aulaSeleccionada) renderizarAlumnos();
-      renderizarAulas();
-    });
+            const nuevaAula = {
+                id: Date.now().toString(),
+                nombre: nombre
+            };
+
+            database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
+            database.ref('asistencias/' + nuevaAula.id).set([]);
+            database.ref('alumnos/' + nuevaAula.id).set([]);
+            
+            mostrarMensaje('Aula creada exitosamente', 'success');
+        }
+
+        function generarQRCode(aulaId) {
+            const urlCompleta = `${URL_ALUMNO}?aula=${aulaId}`;
+            return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(urlCompleta)}&bgcolor=ffffff&color=4c1d95&margin=20`;
+        }
+
+        function abrirModalAlumnos(aulaId) {
+            aulaSeleccionada = aulaId;
+            const aula = aulas[aulaId];
+            document.getElementById('modalTitle').textContent = `${aula.nombre}`;
+            document.getElementById('modalAlumnos').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            renderizarAlumnos();
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalAlumnos').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            document.getElementById('buscarAlumno').value = '';
+            aulaSeleccionada = null;
+        }
+
+        function eliminarAlumno(numeroControl) {
+            if (!confirm('¿Eliminar este alumno?')) return;
+            
+            const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
+            const alumnosActualizados = alumnosAula.filter(a => a.numeroControl !== numeroControl);
+            
+            database.ref('alumnos/' + aulaSeleccionada).set(alumnosActualizados);
+            mostrarMensaje('Alumno eliminado', 'success');
+        }
+
+        function filtrarAlumnos() {
+            renderizarAlumnos();
+        }
+
+        function renderizarAlumnos() {
+            const buscar = document.getElementById('buscarAlumno').value.toLowerCase();
+            const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
+            const alumnosFiltrados = alumnosAula.filter(a => 
+                a.nombre.toLowerCase().includes(buscar) || a.numeroControl.includes(buscar)
+            );
+
+            document.getElementById('contadorAlumnos').textContent = alumnosFiltrados.length;
+            const lista = document.getElementById('listaAlumnos');
+
+            if (alumnosFiltrados.length === 0) {
+                lista.innerHTML = '<p class="text-center text-gray-500 py-8 text-lg">No hay alumnos registrados aún</p>';
+                return;
+            }
+
+            lista.innerHTML = alumnosFiltrados.map(alumno => `
+                <div class="bg-white rounded-xl p-4 flex justify-between items-center shadow-md hover:shadow-lg transition-all border border-gray-100">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg">
+                            ${alumno.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <p class="font-bold text-gray-800 text-base">${alumno.nombre}</p>
+                            <p class="text-sm text-gray-600 font-medium">${alumno.numeroControl}</p>
+                        </div>
+                    </div>
+                    <button onclick="eliminarAlumno('${alumno.numeroControl}')" class="bg-red-500 text-white p-3 rounded-xl hover:bg-red-600 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function exportarExcel(aulaId) {
+            const aula = aulas[aulaId];
+            const registros = asistencias[aulaId] || [];
+
+            if (registros.length === 0) {
+                mostrarMensaje('No hay registros para exportar', 'error');
+                return;
+            }
+
+            let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora\n';
+            registros.forEach(r => {
+                csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${r.hora}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Asistencia_${aula.nombre.replace(/\s/g, '_')}_${new Date().toLocaleDateString('es-MX').replace(/\//g, '-')}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            mostrarMensaje('Archivo descargado exitosamente', 'success');
+        }
+
+        function eliminarAula(aulaId) {
+            const aula = aulas[aulaId];
+            if (!confirm(`¿Eliminar el aula "${aula.nombre}"?`)) return;
+            
+            database.ref('aulas/' + aulaId).remove();
+            database.ref('asistencias/' + aulaId).remove();
+            database.ref('alumnos/' + aulaId).remove();
+            
+            mostrarMensaje('Aula eliminada', 'success');
+        }
+
+        function copiarURL(aulaId) {
+            const urlCompleta = `${URL_ALUMNO}?aula=${aulaId}`;
+            navigator.clipboard.writeText(urlCompleta).then(() => {
+                mostrarMensaje('URL copiada al portapapeles', 'success');
+            }).catch(() => {
+                mostrarMensaje('No se pudo copiar la URL', 'error');
+            });
+        }
+
+        function renderizarAulas() {
+            const container = document.getElementById('aulasContainer');
+            const aulasArray = Object.values(aulas);
+            
+            if (aulasArray.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full card-glass rounded-3xl shadow-2xl p-8 sm:p-12 text-center animate-fade-in">
+                        <div class="text-7xl sm:text-8xl mb-6">📚</div>
+                        <p class="text-gray-700 text-xl sm:text-2xl font-bold mb-2">No hay aulas creadas</p>
+                        <p class="text-gray-500 text-base sm:text-lg">Crea tu primera aula para comenzar</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = aulasArray.map((aula, index) => {
+                const alumnosAula = alumnosRegistrados[aula.id] || [];
+                const asistenciasAula = asistencias[aula.id] || [];
+                const asistenciasHoy = asistenciasAula.filter(
+                    a => a.fecha === new Date().toLocaleDateString('es-MX')
+                );
+
+                return `
+                    <div class="card-glass rounded-3xl shadow-xl p-4 sm:p-6 relative hover-lift animate-fade-in" style="animation-delay: ${index * 0.1}s">
+                        <button onclick="eliminarAula('${aula.id}')" class="absolute top-3 right-3 bg-red-500 text-white p-2 rounded-xl hover:bg-red-600 transition-all shadow-lg z-10">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                        
+                        <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 pr-10">${aula.nombre}</h3>
+                        
+                        <div class="qr-container rounded-2xl p-4 sm:p-6 mb-4 shadow-inner">
+                            <img src="${generarQRCode(aula.id)}" alt="QR Code" class="w-48 sm:w-64 h-48 sm:h-64 mx-auto mb-3 rounded-xl shadow-lg">
+                            <p class="text-center text-xs text-gray-600 font-semibold mb-2">Los alumnos escanean este QR</p>
+                            <button onclick="copiarURL('${aula.id}')" class="w-full bg-white text-indigo-600 py-2 px-3 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                Copiar URL
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
+                                <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Alumnos</p>
+                                <p class="text-2xl sm:text-3xl font-bold">${alumnosAula.length}</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
+                                <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Hoy</p>
+                                <p class="text-2xl sm:text-3xl font-bold">${asistenciasHoy.length}</p>
+                            </div>
+                        </div>
+
+                        ${asistenciasHoy.length > 0 ? `
+                            <div class="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border border-green-200">
+                                <p class="font-bold text-gray-700 mb-2 text-sm sm:text-base flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Últimas asistencias:
+                                </p>
+                                <div class="space-y-2 max-h-32 overflow-y-auto">
+                                    ${asistenciasHoy.slice(-5).reverse().map(reg => `
+                                        <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
+                                            <span class="font-semibold text-gray-800">${reg.nombre}</span>
+                                            <span class="text-gray-600">${reg.hora}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="abrirModalAlumnos('${aula.id}')" class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl hover:shadow-xl font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                                Alumnos
+                            </button>
+                            <button onclick="exportarExcel('${aula.id}')" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl hover:shadow-xl font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Excel
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Escuchar cambios en Firebase en tiempo real
+        database.ref('aulas').on('value', (snapshot) => {
+            aulas = snapshot.val() || {};
+            renderizarAulas();
+        });
+
+        database.ref('asistencias').on('value', (snapshot) => {
+            asistencias = snapshot.val() || {};
+            renderizarAulas();
+        });
+
+        database.ref('alumnos').on('value', (snapshot) => {
+            alumnosRegistrados = snapshot.val() || {};
+            if (aulaSeleccionada) {
+                renderizarAlumnos();
+            }
+            renderizarAulas();
+        });
     </script>
 </body>
 </html>
