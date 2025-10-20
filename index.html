@@ -443,10 +443,12 @@
       }).join('');
 
       // Pintar los QR en cada tarjeta
-      aulasArray.forEach(aula => {
-        const div = document.getElementById(`qr-${aula.id}`);
-        if (div) renderQR(div, urlDeSesion(aula.id));
-      });
+      setTimeout(() => {
+        aulasArray.forEach(aula => {
+          const div = document.getElementById(`qr-${aula.id}`);
+          if (div) renderQR(div, urlDeSesion(aula.id));
+        });
+      }, 100);
     }
 
     // ========= Eventos de UI del panel =========
