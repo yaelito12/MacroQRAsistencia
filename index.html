@@ -15,7 +15,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
   <!-- QR code local (sin depender de servicios externos) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
     * { font-family: 'Poppins', sans-serif; }
@@ -244,18 +244,17 @@
       const sid = buildSessionId(aulaId);
       return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}`;
     }
-    function renderQR(div, dataUrl){
-      div.innerHTML = '';
-      const canvas = document.createElement('canvas');
-      canvas.width = 400; canvas.height = 400;
-      div.appendChild(canvas);
-      QRCode.toCanvas(canvas, dataUrl, { width: 400, margin: 2 }, (err) => {
-        if (err) {
-          console.error('QR error:', err);
-          div.innerHTML = '<p class="text-red-600 text-sm">No se pudo generar el QR</p>';
-        }
-      });
-    }
+  function renderQR(div, dataUrl){
+  div.innerHTML = '';
+  new QRCode(div, {
+    text: dataUrl,
+    width: 300,
+    height: 300,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.H
+  });
+}
 
     // ========= Acciones de panel =========
     function crearAula() {
