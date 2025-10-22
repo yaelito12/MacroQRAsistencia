@@ -267,6 +267,7 @@
     }
 
    
+  
     async function crearAula() {
       if (!currentUID) {
         mostrarMensaje('Debes iniciar sesión primero', 'error');
@@ -280,13 +281,23 @@
       }
       
       try {
-        const nuevaAula = { id: Date.now().toString(), nombre: nombre.trim() };
-        await database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
-        await database.ref('asistencias/' + nuevaAula.id).set([]);
-        await database.ref('alumnos/' + nuevaAula.id).set([]);
+        const nuevaAula = { 
+          id: Date.now().toString(), 
+          nombre: nombre.trim() 
+        };
+        
+        // Usar un objeto de updates para hacer la escritura atómica
+        const updates = {};
+        updates['aulas/' + nuevaAula.id] = nuevaAula;
+        updates['asistencias/' + nuevaAula.id] = [];
+        updates['alumnos/' + nuevaAula.id] = [];
+        
+        await database.ref().update(updates);
+        
         mostrarMensaje('Aula creada exitosamente', 'success');
+        console.log('✅ Aula creada:', nuevaAula);
       } catch (error) {
-        console.error('Error al crear aula:', error);
+        console.error('❌ Error al crear aula:', error);
         mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
       }
     }
