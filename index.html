@@ -270,16 +270,39 @@
     });
 
     /* ==== Aulas ==== */
-    function crearAula() {
+   async function crearAula() {
+      if (!currentUID) {
+        mostrarMensaje('Debes iniciar sesión primero', 'error');
+        return;
+      }
+      
       const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
-      if (!nombre) return;
-      const nuevaAula = { id: Date.now().toString(), nombre };
-      database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
-      // IMPORTANTE: NO inicializamos alumnos/asistencias aquí (las reglas bloquean set masivo)
-      mostrarMensaje('Aula creada exitosamente', 'success');
+      if (!nombre || nombre.trim() === '') {
+        mostrarMensaje('Nombre de aula inválido', 'error');
+        return;
+      }
+      
+      try {
+        const nuevaAula = { 
+          id: Date.now().toString(), 
+          nombre: nombre.trim() 
+        };
+        
+        // Usar un objeto de updates para hacer la escritura atómica
+        const updates = {};
+        updates['aulas/' + nuevaAula.id] = nuevaAula;
+        updates['asistencias/' + nuevaAula.id] = [];
+        updates['alumnos/' + nuevaAula.id] = [];
+        
+        await database.ref().update(updates);
+        
+        mostrarMensaje('Aula creada exitosamente', 'success');
+        console.log('✅ Aula creada:', nuevaAula);
+      } catch (error) {
+        console.error('❌ Error al crear aula:', error);
+        mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
+      }
     }
-    $('btnNuevaAula').addEventListener('click', crearAula);
-
     /* ==== Alumnos (modal) ==== */
     function abrirModalAlumnos(aulaId) {
       aulaSeleccionada = aulaId;
