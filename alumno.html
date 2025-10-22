@@ -208,7 +208,8 @@
                     console.log('📚 Información del aula:', aulaInfo);
                     
                     if (aulaInfo) {
-                        document.getElementById('aulaInfo').textContent = aulaInfo.nombre;
+                        const nombreAula = typeof aulaInfo === 'object' ? aulaInfo.nombre : aulaInfo;
+                        document.getElementById('aulaInfo').textContent = nombreAula || 'Aula';
                     } else {
                         document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
                         mostrarMensaje('❌ Aula no encontrada', 'error');
@@ -272,10 +273,13 @@
 
                 // Obtener lista de alumnos registrados
                 const alumnosSnapshot = await database.ref('alumnos/' + aulaId).once('value');
-                const alumnosAula = alumnosSnapshot.val() || [];
+                const alumnosData = alumnosSnapshot.val();
+                const alumnosAula = Array.isArray(alumnosData) 
+                    ? alumnosData 
+                    : (alumnosData ? Object.values(alumnosData) : []);
                 
                 // Buscar al alumno en la lista
-                const alumno = alumnosAula.find(a => a.numeroControl === numeroControl);
+                const alumno = alumnosAula.find(a => a && a.numeroControl === numeroControl);
 
                 if (!alumno) {
                     mostrarMensaje('❌ No estás registrado en esta clase. Contacta a tu profesor.', 'error');
@@ -299,11 +303,15 @@
 
                 // Verificar si ya registró asistencia hoy
                 const asistenciasSnapshot = await database.ref('asistencias/' + aulaId).once('value');
-                let registrosAula = asistenciasSnapshot.val() || [];
+                const asistenciasData = asistenciasSnapshot.val();
+                let registrosAula = Array.isArray(asistenciasData) 
+                    ? asistenciasData 
+                    : (asistenciasData ? Object.values(asistenciasData) : []);
+                
                 const fechaHoy = new Date().toLocaleDateString('es-MX');
                 
                 const yaRegistrado = registrosAula.some(
-                    r => r.numeroControl === numeroControl && r.fecha === fechaHoy
+                    r => r && r.numeroControl === numeroControl && r.fecha === fechaHoy
                 );
 
                 if (yaRegistrado) {
@@ -313,15 +321,20 @@
 
                 // Registrar asistencia automáticamente
                 const ahora = new Date();
+                const nombreAula = typeof aula === 'object' ? aula.nombre : aula;
                 const registro = {
                     numeroControl: numeroControl,
                     nombre: alumno.nombre,
                     fecha: fechaHoy,
                     hora: ahora.toLocaleTimeString('es-MX'),
-                    aula: aula.nombre,
+                    aula: nombreAula || 'Aula',
                     dispositivo: deviceId
                 };
 
+                // Asegurarnos de que registrosAula sea un array válido
+                if (!Array.isArray(registrosAula)) {
+                    registrosAula = [];
+                }
                 registrosAula.push(registro);
                 await database.ref('asistencias/' + aulaId).set(registrosAula);
 
