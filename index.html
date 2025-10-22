@@ -266,14 +266,29 @@
       });
     }
 
-    function crearAula() {
+   
+    async function crearAula() {
+      if (!currentUID) {
+        mostrarMensaje('Debes iniciar sesión primero', 'error');
+        return;
+      }
+      
       const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
-      if (!nombre) return;
-      const nuevaAula = { id: Date.now().toString(), nombre };
-      database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
-      database.ref('asistencias/' + nuevaAula.id).set([]);
-      database.ref('alumnos/' + nuevaAula.id).set([]);
-      mostrarMensaje('Aula creada exitosamente', 'success');
+      if (!nombre || nombre.trim() === '') {
+        mostrarMensaje('Nombre de aula inválido', 'error');
+        return;
+      }
+      
+      try {
+        const nuevaAula = { id: Date.now().toString(), nombre: nombre.trim() };
+        await database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
+        await database.ref('asistencias/' + nuevaAula.id).set([]);
+        await database.ref('alumnos/' + nuevaAula.id).set([]);
+        mostrarMensaje('Aula creada exitosamente', 'success');
+      } catch (error) {
+        console.error('Error al crear aula:', error);
+        mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
+      }
     }
 
     // Validaciones
