@@ -146,7 +146,7 @@
         <div class="bg-gray-50 rounded-2xl p-4 sm:p-6">
           <h4 class="font-bold text-lg sm:text-xl text-gray-800 mb-4 flex items-center gap-2">
             <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
             Alumnos Registrados (<span id="contadorAlumnos">0</span>)
           </h4>
@@ -187,6 +187,7 @@
 
     /* ==== Utils ==== */
     const $ = (id)=>document.getElementById(id);
+    const fechaKeyIso = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
 
     function mostrarMensaje(texto, tipo) {
       const toast = $('toast');
@@ -210,10 +211,8 @@
 
     function buildSessionId(aulaId){
       const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
-      return `${aulaId}-${yyyy}${mm}${dd}`;
+      const ymd = fechaKeyIso().replaceAll('-',''); // para el QR solo (no se guarda)
+      return `${aulaId}-${ymd}`;
     }
     function urlDeSesion(aulaId){
       const sid = buildSessionId(aulaId);
@@ -232,8 +231,29 @@
     }
 
     /* ==== Auth ==== */
+    let listenersActive = false;
+    function startAdminListeners(){
+      if (listenersActive) return;
+      listenersActive = true;
+      database.ref('aulas').on('value', (s) => { aulas = s.val() || {}; renderizarAulas(); });
+      database.ref('alumnos').on('value', (s) => {
+        alumnosRegistrados = s.val() || {};
+        if (aulaSeleccionada) renderizarAlumnos();
+        renderizarAulas();
+      });
+      database.ref('asistencias').on('value', (s) => { asistencias = s.val() || {}; renderizarAulas(); });
+    }
+
+    function stopAdminListeners(){
+      listenersActive = false;
+      database.ref('aulas').off();
+      database.ref('alumnos').off();
+      database.ref('asistencias').off();
+    }
+
     auth.onAuthStateChanged(async (user) => {
       if (!user) {
+        stopAdminListeners();
         $('loginCard').classList.remove('hidden');
         $('panel').classList.add('hidden');
         return;
@@ -242,6 +262,7 @@
       $('whoami').textContent = `UID: ${currentUID}`;
       const isAdmin = await checkIsAdmin(currentUID);
       if (!isAdmin) {
+        stopAdminListeners();
         $('loginCard').classList.remove('hidden');
         $('panel').classList.add('hidden');
         mostrarMensaje('Tu cuenta no tiene permisos de profesor. Pide que te agreguen en admins/{uid}.', 'error');
@@ -249,6 +270,7 @@
       }
       $('loginCard').classList.add('hidden');
       $('panel').classList.remove('hidden');
+      startAdminListeners();
     });
 
     $('btnLogin').addEventListener('click', async () => {
@@ -275,7 +297,6 @@
       if (!nombre) return;
       const nuevaAula = { id: Date.now().toString(), nombre };
       database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
-      // IMPORTANTE: NO inicializamos alumnos/asistencias aquí (las reglas bloquean set masivo)
       mostrarMensaje('Aula creada exitosamente', 'success');
     }
     $('btnNuevaAula').addEventListener('click', crearAula);
@@ -297,10 +318,10 @@
     }
     $('btnCerrarModal').addEventListener('click', cerrarModal);
 
-    $('nuevoNumControl').addEventListener('input', function(e) {
+    $('nuevoNumControl').addEventListener('input', function() {
       this.value = this.value.replace(/\D/g, '').substring(0, 8);
     });
-    $('nuevoNombre').addEventListener('input', function(e) {
+    $('nuevoNombre').addEventListener('input', function() {
       this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
     });
 
@@ -377,18 +398,21 @@
     }
 
     function exportarExcel(aulaId) {
-      const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+      const fk = fechaKeyIso(); // YYYY-MM-DD (¡igual que en la BD!)
       const aula = aulas[aulaId];
-      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
+      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fk]) || {};
       const registros = Object.values(registrosObj);
       if (registros.length === 0) { mostrarMensaje('No hay registros para exportar', 'error'); return; }
 
       let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora\n';
-      registros.forEach(r => { csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${r.hora}\n`; });
+      registros.forEach(r => {
+        const horaTxt = r.hora ? new Date(r.hora).toLocaleTimeString('es-MX') : '';
+        csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${horaTxt}\n`;
+      });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.csv`;
+      link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fk}.csv`;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
       mostrarMensaje('Archivo descargado exitosamente', 'success');
     }
@@ -406,11 +430,11 @@
         return;
       }
 
-      const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+      const fk = fechaKeyIso(); // YYYY-MM-DD
 
       container.innerHTML = aulasArray.map((aula, index) => {
         const alumnosAula = Object.values(alumnosRegistrados[aula.id] || {});
-        const registrosHoyObj = (asistencias[aula.id] && asistencias[aula.id][fechaKey]) || {};
+        const registrosHoyObj = (asistencias[aula.id] && asistencias[aula.id][fk]) || {};
         const registrosHoy = Object.values(registrosHoyObj);
 
         const ultimos = registrosHoy.slice(-5).reverse();
@@ -456,12 +480,14 @@
                   Últimas asistencias:
                 </p>
                 <div class="space-y-2 max-h-32 overflow-y-auto">
-                  ${ultimos.map(reg => `
-                    <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
-                      <span class="font-semibold text-gray-800">${reg.nombre}</span>
-                      <span class="text-gray-600">${reg.hora}</span>
-                    </div>
-                  `).join('')}
+                  ${ultimos.map(reg => {
+                    const horaTxt = reg.hora ? new Date(reg.hora).toLocaleTimeString('es-MX') : '';
+                    return `
+                      <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
+                        <span class="font-semibold text-gray-800">${reg.nombre}</span>
+                        <span class="text-gray-600">${horaTxt}</span>
+                      </div>`;
+                  }).join('')}
                 </div>
               </div>` : ''}
 
@@ -494,18 +520,10 @@
       const aula = aulas[aulaId];
       if (!confirm(`¿Eliminar el aula "${aula?.nombre||aulaId}"?`)) return;
       database.ref('aulas/' + aulaId).remove();
-      // No borro alumnos/asistencias automáticamente por seguridad. Hazlo manual si lo deseas.
       mostrarMensaje('Aula eliminada', 'success');
     }
 
-    /* ==== Subscripciones DB ==== */
-    database.ref('aulas').on('value', (s) => { aulas = s.val() || {}; renderizarAulas(); });
-    database.ref('alumnos').on('value', (s) => {
-      alumnosRegistrados = s.val() || {};
-      if (aulaSeleccionada) renderizarAlumnos();
-      renderizarAulas();
-    });
-    database.ref('asistencias').on('value', (s) => { asistencias = s.val() || {}; renderizarAulas(); });
+    // (Las suscripciones se activan sólo después de verificar admin)
   </script>
 </body>
 </html>
