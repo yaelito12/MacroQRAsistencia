@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Profesor - Sistema de Asistencia QR</title>
 
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
+  <!-- QR -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
@@ -124,7 +127,7 @@
               <input type="text" id="nuevoNombre" placeholder="Juan Pérez García" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:outline-none">
             </div>
           </div>
-          <button onclick="agregarAlumnoManual()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-bold hover:shadow-xl transition-all">
+          <button id="btnAgregarAlumno" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-bold hover:shadow-xl transition-all">
             Agregar Alumno
           </button>
         </div>
@@ -157,6 +160,7 @@
   <div id="toast" class="hidden fixed top-4 right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold max-w-sm"></div>
 
   <script>
+    /* ==== Firebase ==== */
     const firebaseConfig = {
       apiKey: "AIzaSyCnjFF4srF6nlhrGO0EteYGe6C7W36wSPc",
       authDomain: "macroqr-9cee8.firebaseapp.com",
@@ -171,14 +175,17 @@
     const auth = firebase.auth();
     const database = firebase.database();
 
+    /* ==== Config local ==== */
     const URL_ALUMNO = 'https://yaelito12.github.io/MacroQRAsistencia/alumno.html';
 
+    /* ==== Estado ==== */
     let aulas = {};
     let asistencias = {};
     let alumnosRegistrados = {};
     let aulaSeleccionada = null;
     let currentUID = null;
 
+    /* ==== Utils ==== */
     const $ = (id)=>document.getElementById(id);
 
     function mostrarMensaje(texto, tipo) {
@@ -188,7 +195,7 @@
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             ${tipo === 'success' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
               tipo === 'error' ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>' :
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'}
+                                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'}
           </svg>
           <span>${texto}</span>
         </div>`;
@@ -201,11 +208,30 @@
       setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
+    function buildSessionId(aulaId){
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${aulaId}-${yyyy}${mm}${dd}`;
+    }
+    function urlDeSesion(aulaId){
+      const sid = buildSessionId(aulaId);
+      return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}`;
+    }
+    function renderQR(div, dataUrl){
+      div.innerHTML = '';
+      new QRCode(div, { text: dataUrl, width: 300, height: 300, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+    }
+    function validarNumeroControl(num) { return /^\d{8}$/.test(num); }
+    function validarNombre(nombre) { return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre); }
+
     async function checkIsAdmin(uid){
       const snap = await database.ref('admins/'+uid).get();
       return snap.exists() && snap.val() === true;
     }
 
+    /* ==== Auth ==== */
     auth.onAuthStateChanged(async (user) => {
       if (!user) {
         $('loginCard').classList.remove('hidden');
@@ -243,110 +269,18 @@
       mostrarMensaje('Sesión cerrada', 'success');
     });
 
-    function buildSessionId(aulaId){
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
-      return `${aulaId}-${yyyy}${mm}${dd}`;
-    }
-    function urlDeSesion(aulaId){
-      const sid = buildSessionId(aulaId);
-      return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}`;
-    }
-    function renderQR(div, dataUrl){
-      div.innerHTML = '';
-      new QRCode(div, {
-        text: dataUrl,
-        width: 300,
-        height: 300,
-        colorDark: "#000000",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
-    }
-
-   
-  
-    async function crearAula() {
-      if (!currentUID) {
-        mostrarMensaje('Debes iniciar sesión primero', 'error');
-        return;
-      }
-      
+    /* ==== Aulas ==== */
+    function crearAula() {
       const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
-      if (!nombre || nombre.trim() === '') {
-        mostrarMensaje('Nombre de aula inválido', 'error');
-        return;
-      }
-      
-      try {
-        const nuevaAula = { 
-          id: Date.now().toString(), 
-          nombre: nombre.trim() 
-        };
-        
-        // Usar un objeto de updates para hacer la escritura atómica
-        const updates = {};
-        updates['aulas/' + nuevaAula.id] = nuevaAula;
-        updates['asistencias/' + nuevaAula.id] = [];
-        updates['alumnos/' + nuevaAula.id] = [];
-        
-        await database.ref().update(updates);
-        
-        mostrarMensaje('Aula creada exitosamente', 'success');
-        console.log('✅ Aula creada:', nuevaAula);
-      } catch (error) {
-        console.error('❌ Error al crear aula:', error);
-        mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
-      }
+      if (!nombre) return;
+      const nuevaAula = { id: Date.now().toString(), nombre };
+      database.ref('aulas/' + nuevaAula.id).set(nuevaAula);
+      // IMPORTANTE: NO inicializamos alumnos/asistencias aquí (las reglas bloquean set masivo)
+      mostrarMensaje('Aula creada exitosamente', 'success');
     }
+    $('btnNuevaAula').addEventListener('click', crearAula);
 
-    // Validaciones
-    function validarNumeroControl(num) {
-      return /^\d{8}$/.test(num);
-    }
-
-    function validarNombre(nombre) {
-      return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre);
-    }
-
-    // Agregar alumno manualmente
-    window.agregarAlumnoManual = async function() {
-      const numControl = $('nuevoNumControl').value.trim();
-      const nombre = $('nuevoNombre').value.trim();
-
-      if (!numControl || !nombre) {
-        mostrarMensaje('Completa todos los campos', 'error');
-        return;
-      }
-
-      if (!validarNumeroControl(numControl)) {
-        mostrarMensaje('El número de control debe tener exactamente 8 dígitos', 'error');
-        return;
-      }
-
-      if (!validarNombre(nombre)) {
-        mostrarMensaje('El nombre solo debe contener letras y espacios', 'error');
-        return;
-      }
-
-      const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
-      const existe = alumnosAula.find(a => a.numeroControl === numControl);
-
-      if (existe) {
-        mostrarMensaje('Este alumno ya está registrado', 'error');
-        return;
-      }
-
-      alumnosAula.push({ numeroControl: numControl, nombre: nombre });
-      await database.ref('alumnos/' + aulaSeleccionada).set(alumnosAula);
-      
-      $('nuevoNumControl').value = '';
-      $('nuevoNombre').value = '';
-      mostrarMensaje('Alumno agregado exitosamente', 'success');
-    };
-
+    /* ==== Alumnos (modal) ==== */
     function abrirModalAlumnos(aulaId) {
       aulaSeleccionada = aulaId;
       const aula = aulas[aulaId];
@@ -363,31 +297,51 @@
     }
     $('btnCerrarModal').addEventListener('click', cerrarModal);
 
-    function eliminarAlumno(numeroControl) {
-      if (!confirm('¿Eliminar este alumno?')) return;
-      const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
-      const alumnosActualizados = alumnosAula.filter(a => a.numeroControl !== numeroControl);
-      database.ref('alumnos/' + aulaSeleccionada).set(alumnosActualizados);
-      mostrarMensaje('Alumno eliminado', 'success');
-    }
-
-    $('buscarAlumno').addEventListener('input', renderizarAlumnos);
-    
-    // Validación en tiempo real para los campos de agregar alumno
     $('nuevoNumControl').addEventListener('input', function(e) {
       this.value = this.value.replace(/\D/g, '').substring(0, 8);
     });
-
     $('nuevoNombre').addEventListener('input', function(e) {
       this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
     });
 
+    $('btnAgregarAlumno').addEventListener('click', agregarAlumnoManual);
+    $('buscarAlumno').addEventListener('input', renderizarAlumnos);
+
+    async function agregarAlumnoManual() {
+      if (!aulaSeleccionada) return mostrarMensaje('Selecciona un aula', 'error');
+
+      const numControl = $('nuevoNumControl').value.trim();
+      const nombre = $('nuevoNombre').value.trim();
+
+      if (!numControl || !nombre) return mostrarMensaje('Completa todos los campos', 'error');
+      if (!validarNumeroControl(numControl)) return mostrarMensaje('El número de control debe tener exactamente 8 dígitos', 'error');
+      if (!validarNombre(nombre)) return mostrarMensaje('El nombre solo debe contener letras y espacios', 'error');
+
+      const ref = database.ref('alumnos/' + aulaSeleccionada + '/' + numControl);
+      const snap = await ref.get();
+      if (snap.exists()) return mostrarMensaje('Este alumno ya está registrado', 'error');
+
+      await ref.set({ numeroControl: numControl, nombre });
+      $('nuevoNumControl').value = '';
+      $('nuevoNombre').value = '';
+      mostrarMensaje('Alumno agregado exitosamente', 'success');
+    }
+
+    function eliminarAlumno(numeroControl) {
+      if (!confirm('¿Eliminar este alumno?')) return;
+      database.ref('alumnos/' + aulaSeleccionada + '/' + numeroControl).remove();
+      mostrarMensaje('Alumno eliminado', 'success');
+    }
+
     function renderizarAlumnos() {
       const buscar = $('buscarAlumno').value.toLowerCase();
-      const alumnosAula = alumnosRegistrados[aulaSeleccionada] || [];
+      const alumnosObj = alumnosRegistrados[aulaSeleccionada] || {};
+      const alumnosAula = Object.values(alumnosObj);
+
       const alumnosFiltrados = alumnosAula.filter(a =>
         (a.nombre||'').toLowerCase().includes(buscar) || (a.numeroControl||'').includes(buscar)
       );
+
       $('contadorAlumnos').textContent = alumnosFiltrados.length;
       const lista = $('listaAlumnos');
       if (alumnosFiltrados.length === 0) {
@@ -407,42 +361,36 @@
           </div>
           <button onclick="eliminarAlumno('${alumno.numeroControl||''}')" class="bg-red-500 text-white p-3 rounded-xl hover:bg-red-600 transition-all">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 01-1 1v3M4 7h16"></path>
             </svg>
           </button>
         </div>
       `).join('');
     }
 
-    function exportarExcel(aulaId) {
-      const aula = aulas[aulaId];
-      const registros = asistencias[aulaId] || [];
-      if (registros.length === 0) { mostrarMensaje('No hay registros para exportar', 'error'); return; }
-      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora\n';
-      registros.forEach(r => { csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${r.hora}\n`; });
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.href = url;
-      link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${new Date().toLocaleDateString('es-MX').replace(/\//g, '-')}.csv`;
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-      mostrarMensaje('Archivo descargado exitosamente', 'success');
-    }
-
-    function eliminarAula(aulaId) {
-      const aula = aulas[aulaId];
-      if (!confirm(`¿Eliminar el aula "${aula?.nombre||aulaId}"?`)) return;
-      database.ref('aulas/' + aulaId).remove();
-      database.ref('asistencias/' + aulaId).remove();
-      database.ref('alumnos/' + aulaId).remove();
-      mostrarMensaje('Aula eliminada', 'success');
-    }
-
+    /* ==== Asistencias / Aulas UI ==== */
     function copiarURL(aulaId) {
       const urlCompleta = urlDeSesion(aulaId);
       navigator.clipboard.writeText(urlCompleta)
         .then(() => mostrarMensaje('URL copiada al portapapeles', 'success'))
         .catch(()  => mostrarMensaje('No se pudo copiar la URL', 'error'));
+    }
+
+    function exportarExcel(aulaId) {
+      const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+      const aula = aulas[aulaId];
+      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
+      const registros = Object.values(registrosObj);
+      if (registros.length === 0) { mostrarMensaje('No hay registros para exportar', 'error'); return; }
+
+      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora\n';
+      registros.forEach(r => { csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${r.hora}\n`; });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.csv`;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      mostrarMensaje('Archivo descargado exitosamente', 'success');
     }
 
     function renderizarAulas() {
@@ -458,15 +406,20 @@
         return;
       }
 
+      const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+
       container.innerHTML = aulasArray.map((aula, index) => {
-        const alumnosAula = alumnosRegistrados[aula.id] || [];
-        const asistenciasAula = asistencias[aula.id] || [];
-        const asistenciasHoy = asistenciasAula.filter(a => a.fecha === new Date().toLocaleDateString('es-MX'));
+        const alumnosAula = Object.values(alumnosRegistrados[aula.id] || {});
+        const registrosHoyObj = (asistencias[aula.id] && asistencias[aula.id][fechaKey]) || {};
+        const registrosHoy = Object.values(registrosHoyObj);
+
+        const ultimos = registrosHoy.slice(-5).reverse();
+
         return `
           <div class="card-glass rounded-3xl shadow-xl p-4 sm:p-6 relative hover-lift animate-fade-in" style="animation-delay:${index*0.1}s">
             <button onclick="eliminarAula('${aula.id}')" class="absolute top-3 right-3 bg-red-500 text-white p-2 rounded-xl hover:bg-red-600 transition-all shadow-lg z-10">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 01-1 1v3M4 7h16"></path>
               </svg>
             </button>
 
@@ -490,11 +443,11 @@
               </div>
               <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
                 <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Hoy</p>
-                <p class="text-2xl sm:text-3xl font-bold">${asistenciasHoy.length}</p>
+                <p class="text-2xl sm:text-3xl font-bold">${registrosHoy.length}</p>
               </div>
             </div>
 
-            ${asistenciasHoy.length > 0 ? `
+            ${registrosHoy.length > 0 ? `
               <div class="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border border-green-200">
                 <p class="font-bold text-gray-700 mb-2 text-sm sm:text-base flex items-center gap-2">
                   <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,7 +456,7 @@
                   Últimas asistencias:
                 </p>
                 <div class="space-y-2 max-h-32 overflow-y-auto">
-                  ${asistenciasHoy.slice(-5).reverse().map(reg => `
+                  ${ultimos.map(reg => `
                     <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
                       <span class="font-semibold text-gray-800">${reg.nombre}</span>
                       <span class="text-gray-600">${reg.hora}</span>
@@ -523,7 +476,7 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
-                Excel
+                Excel (Hoy)
               </button>
             </div>
           </div>`;
@@ -537,15 +490,22 @@
       }, 100);
     }
 
-    $('btnNuevaAula').addEventListener('click', crearAula);
+    function eliminarAula(aulaId) {
+      const aula = aulas[aulaId];
+      if (!confirm(`¿Eliminar el aula "${aula?.nombre||aulaId}"?`)) return;
+      database.ref('aulas/' + aulaId).remove();
+      // No borro alumnos/asistencias automáticamente por seguridad. Hazlo manual si lo deseas.
+      mostrarMensaje('Aula eliminada', 'success');
+    }
 
+    /* ==== Subscripciones DB ==== */
     database.ref('aulas').on('value', (s) => { aulas = s.val() || {}; renderizarAulas(); });
-    database.ref('asistencias').on('value', (s) => { asistencias = s.val() || {}; renderizarAulas(); });
     database.ref('alumnos').on('value', (s) => {
       alumnosRegistrados = s.val() || {};
       if (aulaSeleccionada) renderizarAlumnos();
       renderizarAulas();
     });
+    database.ref('asistencias').on('value', (s) => { asistencias = s.val() || {}; renderizarAulas(); });
   </script>
 </body>
-</html> 
+</html>
