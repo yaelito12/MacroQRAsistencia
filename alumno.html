@@ -111,7 +111,7 @@
       measurementId: "G-WR5H7L26DH"
     };
 
-    let app, database, auth, currentUser;
+    let app, database, auth;
     try {
       app = firebase.initializeApp(firebaseConfig);
       auth = firebase.auth();
@@ -163,6 +163,14 @@
         localStorage.setItem('deviceId', id);
       }
       return id;
+    }
+
+    /* ==== Auth helper ==== */
+    async function ensureAnonAuth() {
+      if (!auth.currentUser) {
+        await auth.signInAnonymously();
+        console.log('✅ Sesión anónima lista:', auth.currentUser?.uid);
+      }
     }
 
     /* ==== Estado ==== */
@@ -224,58 +232,46 @@
       if (!aulaId) return mostrarMensaje('❌ Código de aula no válido', 'error');
 
       try {
-        // Asegurar sesión anónima
-        if (!auth.currentUser) {
-          await auth.signInAnonymously();
-        }
+        // 1) Asegurar sesión anónima
+        await ensureAnonAuth();
 
-        // Vincular dispositivo (sólo primera vez o mismo)
+        // 2) Ligar dispositivo "a ciegas"
         const deviceId = getDeviceId();
         const dispRef = database.ref('dispositivos/' + aulaId + '/' + numeroControl);
-        const dispSnap = await dispRef.get();
-        const dispositivoRegistrado = dispSnap.val();
-
-        if (dispositivoRegistrado && dispositivoRegistrado !== deviceId) {
-          return mostrarMensaje('❌ Este número de control ya está siendo usado en otro dispositivo', 'error');
-        }
-        if (!dispositivoRegistrado) {
-          await dispRef.set(deviceId); // permitido por reglas (requiere auth)
+        try {
+          await dispRef.set(deviceId);
+        } catch (e) {
+          console.error('Ligar dispositivo falló:', e);
+          return mostrarMensaje('❌ Este número de control ya está ligado a otro dispositivo.', 'error');
         }
 
-        // Claves coherentes con reglas: fecha YYYY-MM-DD, aula = aulaId, hora = Date.now() (número)
+        // 3) Asistencia: fecha YYYY-MM-DD, hora numérica, aula = aulaId
         const ahora = new Date();
         const fechaKey = ahora.toISOString().slice(0, 10); // YYYY-MM-DD
         const refAsistencia = database.ref(`asistencias/${aulaId}/${fechaKey}/${numeroControl}`);
 
-        // ¿Ya registró hoy?
-        const ya = await refAsistencia.get();
-        if (ya.exists()) {
-          return mostrarMensaje('ℹ️ Ya registraste tu asistencia hoy en esta clase', 'error');
-        }
-
-        // Escribimos SIN leer "alumnos/..." (las reglas validan que el alumno exista)
         const registro = {
           numeroControl,
-          nombre: "Alumno",            // opcional: no lo necesitamos para que pase la regla
-          fecha: fechaKey,
-          hora: Date.now(),
-          aula: aulaId,
+          nombre: "Alumno",   // string no vacío
+          fecha: fechaKey,    // == $fechaKey
+          hora: Date.now(),   // número; ventana ±60s en reglas
+          aula: aulaId,       // == $aulaId
           dispositivo: deviceId
         };
 
         await refAsistencia.set(registro);
 
-        // UI éxito
+        // 4) UI éxito (no hacemos lecturas posteriores que puedan fallar)
         document.getElementById('formulario').classList.add('hidden');
         document.getElementById('exitoMensaje').classList.remove('hidden');
         document.getElementById('nombreExito').textContent = `Bienvenido(a), ${numeroControl}`;
-        mostrarMensaje(`🎉 ¡Registro exitoso!`, 'success');
+        mostrarMensaje('🎉 ¡Registro exitoso!', 'success');
 
       } catch (error) {
         console.error('❌ Error al registrar asistencia:', error);
-        // Si las reglas bloquearon porque el alumno no existe en el aula:
-        if (String(error).includes('PERMISSION_DENIED') || String(error).includes('permission_denied')) {
-          return mostrarMensaje('❌ No estás registrado en esta clase o el pase no está abierto.', 'error');
+        if (String(error).includes('permission_denied') || String(error).includes('PERMISSION_DENIED')) {
+          // Puede ser: ya registró hoy, no existe en alumnos, o formato inválido según reglas
+          return mostrarMensaje('❌ No estás dado de alta o ya registraste hoy.', 'error');
         }
         mostrarMensaje('❌ Error al registrar asistencia. Intenta de nuevo.', 'error');
       }
@@ -289,8 +285,7 @@
       console.log('🚀 Página cargada');
       console.log('📱 Device ID:', getDeviceId());
       try {
-        await auth.signInAnonymously();
-        console.log('✅ Sesión anónima lista');
+        await ensureAnonAuth();
       } catch (e) {
         console.error('❌ No se pudo iniciar sesión anónima:', e);
       }
