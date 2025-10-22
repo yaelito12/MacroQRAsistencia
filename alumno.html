@@ -11,6 +11,7 @@
 
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
   <style>
@@ -110,9 +111,10 @@
       measurementId: "G-WR5H7L26DH"
     };
 
-    let app, database;
+    let app, database, auth, currentUser;
     try {
       app = firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
       database = firebase.database();
       console.log('✅ Firebase inicializado');
     } catch (e) {
@@ -130,7 +132,7 @@
               ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
               : tipo === 'error'
               ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
-              : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'}
+              : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 0 0118 0z"></path>'}
           </svg>
           <span class="text-sm sm:text-base">${texto}</span>
         </div>
@@ -163,11 +165,11 @@
       return id;
     }
 
-    /* ==== Estado de la página ==== */
+    /* ==== Estado ==== */
     let aulaId = null;
     let aulaInfo = null;
 
-    function cargarInfoAula() {
+    async function cargarInfoAula() {
       aulaId = obtenerParametroURL('aula');
       console.log('🔍 Aula ID:', aulaId);
 
@@ -177,24 +179,23 @@
         return;
       }
 
-      database.ref('aulas/' + aulaId).once('value')
-        .then(s => {
-          aulaInfo = s.val();
-          if (aulaInfo) {
-            document.getElementById('aulaInfo').textContent = aulaInfo.nombre || aulaId;
-          } else {
-            document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
-            mostrarMensaje('❌ Aula no encontrada', 'error');
-          }
-        })
-        .catch(err => {
-          console.error('❌ Error aula:', err);
-          document.getElementById('aulaInfo').textContent = 'Error al cargar';
-          mostrarMensaje('❌ Error al conectar con el servidor', 'error');
-        });
+      try {
+        const s = await database.ref('aulas/' + aulaId).get();
+        aulaInfo = s.val();
+        if (aulaInfo) {
+          document.getElementById('aulaInfo').textContent = aulaInfo.nombre || aulaId;
+        } else {
+          document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
+          mostrarMensaje('❌ Aula no encontrada', 'error');
+        }
+      } catch (err) {
+        console.error('❌ Error aula:', err);
+        document.getElementById('aulaInfo').textContent = 'Error al cargar';
+        mostrarMensaje('❌ Error al conectar con el servidor', 'error');
+      }
     }
 
-    /* ==== Validación input en tiempo real ==== */
+    /* ==== Validación input ==== */
     document.getElementById('numeroControl').addEventListener('input', function () {
       this.value = this.value.replace(/\D/g, '').substring(0, 8);
       const errorMsg = document.getElementById('errorNumControl');
@@ -223,16 +224,12 @@
       if (!aulaId) return mostrarMensaje('❌ Código de aula no válido', 'error');
 
       try {
-        // 1) Asegurar que el aula existe
-        const aulaSnap = await database.ref('aulas/' + aulaId).get();
-        if (!aulaSnap.exists()) return mostrarMensaje('❌ Aula no encontrada', 'error');
+        // Asegurar sesión anónima
+        if (!auth.currentUser) {
+          await auth.signInAnonymously();
+        }
 
-        // 2) Leer SOLO el nodo del alumno (acorde a reglas nuevas)
-        const alumnoSnap = await database.ref('alumnos/' + aulaId + '/' + numeroControl).get();
-        const alumno = alumnoSnap.val();
-        if (!alumno) return mostrarMensaje('❌ No estás registrado en esta clase. Contacta a tu profesor.', 'error');
-
-        // 3) Vincular dispositivo (solo primera vez o mismo device)
+        // Vincular dispositivo (sólo primera vez o mismo)
         const deviceId = getDeviceId();
         const dispRef = database.ref('dispositivos/' + aulaId + '/' + numeroControl);
         const dispSnap = await dispRef.get();
@@ -242,37 +239,44 @@
           return mostrarMensaje('❌ Este número de control ya está siendo usado en otro dispositivo', 'error');
         }
         if (!dispositivoRegistrado) {
-          await dispRef.set(deviceId); // permitido por reglas
+          await dispRef.set(deviceId); // permitido por reglas (requiere auth)
         }
 
-        // 4) Asistencia por fecha + numeroControl
+        // Claves coherentes con reglas: fecha YYYY-MM-DD, aula = aulaId, hora = Date.now() (número)
         const ahora = new Date();
-        const fechaKey = ahora.toLocaleDateString('es-MX').split('/').reverse().join(''); // YYYYMMDD
+        const fechaKey = ahora.toISOString().slice(0, 10); // YYYY-MM-DD
         const refAsistencia = database.ref(`asistencias/${aulaId}/${fechaKey}/${numeroControl}`);
 
         // ¿Ya registró hoy?
-        if ((await refAsistencia.get()).exists()) {
+        const ya = await refAsistencia.get();
+        if (ya.exists()) {
           return mostrarMensaje('ℹ️ Ya registraste tu asistencia hoy en esta clase', 'error');
         }
 
-        // Guardar asistencia
+        // Escribimos SIN leer "alumnos/..." (las reglas validan que el alumno exista)
         const registro = {
           numeroControl,
-          nombre: alumno.nombre,
+          nombre: "Alumno",            // opcional: no lo necesitamos para que pase la regla
           fecha: fechaKey,
-          hora: ahora.toLocaleTimeString('es-MX'),
-          aula: aulaInfo?.nombre || '',
+          hora: Date.now(),
+          aula: aulaId,
           dispositivo: deviceId
         };
+
         await refAsistencia.set(registro);
 
-        // 5) UI éxito
+        // UI éxito
         document.getElementById('formulario').classList.add('hidden');
         document.getElementById('exitoMensaje').classList.remove('hidden');
-        document.getElementById('nombreExito').textContent = `Bienvenido(a), ${alumno.nombre}`;
-        mostrarMensaje(`🎉 ¡Bienvenido ${alumno.nombre}!`, 'success');
+        document.getElementById('nombreExito').textContent = `Bienvenido(a), ${numeroControl}`;
+        mostrarMensaje(`🎉 ¡Registro exitoso!`, 'success');
+
       } catch (error) {
         console.error('❌ Error al registrar asistencia:', error);
+        // Si las reglas bloquearon porque el alumno no existe en el aula:
+        if (String(error).includes('PERMISSION_DENIED') || String(error).includes('permission_denied')) {
+          return mostrarMensaje('❌ No estás registrado en esta clase o el pase no está abierto.', 'error');
+        }
         mostrarMensaje('❌ Error al registrar asistencia. Intenta de nuevo.', 'error');
       }
     }
@@ -280,9 +284,16 @@
     document.getElementById('btnRegistrar').addEventListener('click', verificarAlumno);
     document.getElementById('numeroControl').addEventListener('keypress', e => { if (e.key === 'Enter') verificarAlumno(); });
 
-    window.addEventListener('load', () => {
+    // Arranque: asegurar auth anónima y luego cargar aula
+    window.addEventListener('load', async () => {
       console.log('🚀 Página cargada');
       console.log('📱 Device ID:', getDeviceId());
+      try {
+        await auth.signInAnonymously();
+        console.log('✅ Sesión anónima lista');
+      } catch (e) {
+        console.error('❌ No se pudo iniciar sesión anónima:', e);
+      }
       cargarInfoAula();
     });
   </script>
