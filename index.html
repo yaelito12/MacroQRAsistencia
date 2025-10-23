@@ -270,6 +270,7 @@
     });
 
     /* ==== Aulas ==== */
+      $('btnNuevaAula').addEventListener('click', crearAula);
    async function crearAula() {
       if (!currentUID) {
         mostrarMensaje('Debes iniciar sesión primero', 'error');
