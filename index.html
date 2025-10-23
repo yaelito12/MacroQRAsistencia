@@ -268,10 +268,8 @@
       await auth.signOut();
       mostrarMensaje('Sesión cerrada', 'success');
     });
-
     /* ==== Aulas ==== */
-      $('btnNuevaAula').addEventListener('click', crearAula);
-   async function crearAula() {
+    async function crearAula() {
       if (!currentUID) {
         mostrarMensaje('Debes iniciar sesión primero', 'error');
         return;
@@ -292,8 +290,8 @@
         // Usar un objeto de updates para hacer la escritura atómica
         const updates = {};
         updates['aulas/' + nuevaAula.id] = nuevaAula;
-        updates['asistencias/' + nuevaAula.id] = [];
-        updates['alumnos/' + nuevaAula.id] = [];
+        updates['asistencias/' + nuevaAula.id] = {};
+        updates['alumnos/' + nuevaAula.id] = {};
         
         await database.ref().update(updates);
         
@@ -304,6 +302,8 @@
         mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
       }
     }
+
+    $('btnNuevaAula').addEventListener('click', crearAula);
     /* ==== Alumnos (modal) ==== */
     function abrirModalAlumnos(aulaId) {
       aulaSeleccionada = aulaId;
