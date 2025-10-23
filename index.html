@@ -269,39 +269,29 @@
       mostrarMensaje('Sesión cerrada', 'success');
     });
     /* ==== Aulas ==== */
-    async function crearAula() {
-      if (!currentUID) {
-        mostrarMensaje('Debes iniciar sesión primero', 'error');
-        return;
-      }
-      
-      const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
-      if (!nombre || nombre.trim() === '') {
-        mostrarMensaje('Nombre de aula inválido', 'error');
-        return;
-      }
-      
-      try {
-        const nuevaAula = { 
-          id: Date.now().toString(), 
-          nombre: nombre.trim() 
-        };
-        
-        // Usar un objeto de updates para hacer la escritura atómica
-        const updates = {};
-        updates['aulas/' + nuevaAula.id] = nuevaAula;
-        updates['asistencias/' + nuevaAula.id] = {};
-        updates['alumnos/' + nuevaAula.id] = {};
-        
-        await database.ref().update(updates);
-        
-        mostrarMensaje('Aula creada exitosamente', 'success');
-        console.log('✅ Aula creada:', nuevaAula);
-      } catch (error) {
-        console.error('❌ Error al crear aula:', error);
-        mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
-      }
-    }
+  async function crearAula() {
+  if (!currentUID) { mostrarMensaje('Debes iniciar sesión primero', 'error'); return; }
+
+  const nombre = prompt('Nombre del aula (ej: Matemáticas 101):');
+  if (!nombre || nombre.trim() === '') { mostrarMensaje('Nombre inválido', 'error'); return; }
+
+  try {
+    const nuevaAula = { id: Date.now().toString(), nombre: nombre.trim() };
+
+    // SOLO escribe el aula. NO escribas alumnos/asistencias aquí.
+    await database.ref('aulas/' + nuevaAula.id).set({
+      ...nuevaAula,
+      creadoPor: currentUID,
+      creadoEn: Date.now()
+    });
+
+    mostrarMensaje('Aula creada exitosamente', 'success');
+    console.log('✅ Aula creada:', nuevaAula);
+  } catch (error) {
+    console.error('❌ Error al crear aula:', error);
+    mostrarMensaje('Error al crear el aula: ' + error.message, 'error');
+  }
+}
 
     $('btnNuevaAula').addEventListener('click', crearAula);
     /* ==== Alumnos (modal) ==== */
