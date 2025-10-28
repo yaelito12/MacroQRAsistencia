@@ -297,7 +297,7 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
           creadoEn: Date.now()
         };
 
-        console.log('📤 Guardando aula:', payload);
+      console.log('📤 Guardando aula:', payload);
         await refAula.set(payload);
         // inicializar solo alumnos (asistencias se crea automáticamente al registrar)
         await database.ref('alumnos/' + aulaId).set({});
