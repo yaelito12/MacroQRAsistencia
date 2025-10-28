@@ -369,6 +369,39 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
       mostrarMensaje('Alumno eliminado', 'success');
     }
 
+    function obtenerRegistrosHoy(aulaId, fechaKey) {
+      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
+      let registros = [];
+      
+      Object.keys(registrosObj).forEach(numeroControl => {
+        const alumnoData = registrosObj[numeroControl];
+        
+        // Agregar entrada si existe
+        if (alumnoData.entrada) {
+          registros.push({
+            ...alumnoData.entrada,
+            tipo: 'entrada'
+          });
+        }
+        
+        // Agregar salida si existe
+        if (alumnoData.salida) {
+          registros.push({
+            ...alumnoData.salida,
+            tipo: 'salida'
+          });
+        }
+      });
+      
+      // Ordenar por hora (más reciente primero)
+      registros.sort((a, b) => {
+        const timeA = a.hora || '00:00:00';
+        const timeB = b.hora || '00:00:00';
+        return timeB.localeCompare(timeA);
+      });
+      
+      return registros;
+    }
     function renderizarAlumnos() {
       const buscar = $('buscarAlumno').value.toLowerCase();
       const alumnosObj = (alumnosRegistrados && alumnosRegistrados[aulaSeleccionada]) || {};
@@ -450,7 +483,6 @@ function copiarURL(aulaId, tipo = 'entrada') {
   document.body.removeChild(link);
   mostrarMensaje('Archivo descargado exitosamente', 'success');
 }
-
     function renderizarAulas() {
       const container = $('aulasContainer');
       const aulasArray = Object.values(aulas || {});
