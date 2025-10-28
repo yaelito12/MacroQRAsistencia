@@ -9,11 +9,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Firebase (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
   <style>
     * { font-family: 'Poppins', sans-serif; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -21,9 +16,12 @@
     .animate-fade-in { animation: fadeIn .5s ease-out; }
     .animate-pulse-slow { animation: pulse 2s infinite; }
     .gradient-bg { background: linear-gradient(135deg,#10b981 0%,#059669 100%); }
+    .gradient-bg-salida { background: linear-gradient(135deg,#ef4444 0%,#dc2626 100%); }
     .card-glass { background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.3); }
     .btn-primary { background: linear-gradient(135deg,#10b981 0%,#059669 100%); transition: all .3s ease; }
     .btn-primary:hover { transform: scale(1.05); box-shadow: 0 15px 30px rgba(16,185,129,.4); }
+    .btn-salida { background: linear-gradient(135deg,#ef4444 0%,#dc2626 100%); transition: all .3s ease; }
+    .btn-salida:hover { transform: scale(1.05); box-shadow: 0 15px 30px rgba(239,68,68,.4); }
     .input-error { border-color: #ef4444 !important; background-color: #fef2f2; }
   </style>
 </head>
@@ -31,12 +29,12 @@
   <div class="container mx-auto max-w-lg">
     <!-- Header -->
     <div class="card-glass rounded-3xl shadow-2xl p-8 mb-8 text-center animate-fade-in">
-      <div class="bg-gradient-to-br from-green-500 to-emerald-600 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl animate-pulse-slow">
+      <div id="iconContainer" class="bg-gradient-to-br from-green-500 to-emerald-600 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl animate-pulse-slow">
         <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
       </div>
-      <h1 class="text-4xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+      <h1 id="tituloHeader" class="text-4xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
         Registro de Asistencia
       </h1>
       <p id="aulaInfo" class="text-gray-600 font-semibold text-lg">Cargando...</p>
@@ -66,10 +64,10 @@
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        Registrar Asistencia
+        <span id="btnTexto">Registrar Entrada</span>
       </button>
 
-      <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border-2 border-blue-100">
+      <div id="infoBox" class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border-2 border-blue-100">
         <p class="text-blue-900 text-sm font-bold flex items-start gap-2">
           <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -81,14 +79,14 @@
 
     <!-- Mensaje de éxito -->
     <div id="exitoMensaje" class="hidden card-glass rounded-3xl shadow-2xl p-8 text-center animate-fade-in">
-      <div class="bg-gradient-to-br from-green-500 to-emerald-600 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+      <div id="exitoIcon" class="bg-gradient-to-br from-green-500 to-emerald-600 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
         <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
         </svg>
       </div>
-      <h2 class="text-3xl font-bold text-gray-800 mb-4">¡Asistencia Registrada!</h2>
+      <h2 id="exitoTitulo" class="text-3xl font-bold text-gray-800 mb-4">¡Asistencia Registrada!</h2>
       <p id="nombreExito" class="text-lg text-gray-600 mb-2 font-semibold"></p>
-      <p class="text-base text-gray-500 mb-6">Tu asistencia ha sido registrada exitosamente</p>
+      <p id="exitoDescripcion" class="text-base text-gray-500 mb-6">Tu asistencia ha sido registrada exitosamente</p>
       <button onclick="location.reload()" class="btn-primary text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl">
         Cerrar
       </button>
@@ -111,11 +109,11 @@
       measurementId: "G-WR5H7L26DH"
     };
 
-    let app, auth, database;
+    let app, database, auth;
     try {
       app = firebase.initializeApp(firebaseConfig);
-      auth = firebase.auth();
       database = firebase.database();
+      auth = firebase.auth();
       console.log('✅ Firebase inicializado');
     } catch (e) {
       console.error('❌ Error Firebase:', e);
@@ -168,36 +166,14 @@
     /* ==== Estado de la página ==== */
     let aulaId = null;
     let aulaInfo = null;
-    let authReady = false;
+    let tipoRegistro = 'entrada'; // 'entrada' o 'salida'
 
-    // CRÍTICO: Esperar a que la autenticación esté lista
-    auth.onAuthStateChanged(async (user) => {
-      console.log('🔐 Auth state changed:', user ? user.uid : 'no user');
-      
-      if (!user) {
-        console.log('🔑 Haciendo login anónimo...');
-        try {
-          await auth.signInAnonymously();
-          console.log('✅ Login anónimo exitoso');
-        } catch (error) {
-          console.error('❌ Error en login anónimo:', error);
-          mostrarMensaje('Error al conectar. Intenta recargar la página.', 'error');
-          return;
-        }
-      }
-      
-      authReady = true;
-      cargarInfoAula();
-    });
-
-    function cargarInfoAula() {
-      if (!authReady) {
-        console.log('⏳ Esperando autenticación...');
-        return;
-      }
-
+    async function cargarInfoAula() {
       aulaId = obtenerParametroURL('aula');
+      tipoRegistro = obtenerParametroURL('tipo') || 'entrada';
+      
       console.log('🔍 Aula ID:', aulaId);
+      console.log('📍 Tipo:', tipoRegistro);
 
       if (!aulaId) {
         mostrarMensaje('❌ Código de aula no válido', 'error');
@@ -205,22 +181,72 @@
         return;
       }
 
-      database.ref('aulas/' + aulaId).once('value')
-        .then(s => {
-          aulaInfo = s.val();
-          console.log('📚 Aula cargada:', aulaInfo);
-          if (aulaInfo) {
-            document.getElementById('aulaInfo').textContent = aulaInfo.nombre || aulaId;
-          } else {
-            document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
-            mostrarMensaje('❌ Aula no encontrada', 'error');
-          }
-        })
-        .catch(err => {
-          console.error('❌ Error aula:', err);
-          document.getElementById('aulaInfo').textContent = 'Error al cargar';
-          mostrarMensaje('❌ Error al conectar con el servidor', 'error');
-        });
+      // Actualizar UI según el tipo
+      actualizarUITipo();
+
+      try {
+        console.log('🔐 Autenticando...');
+        await auth.signInAnonymously();
+        console.log('✅ Autenticado:', auth.currentUser.uid);
+
+        const s = await database.ref('aulas/' + aulaId).once('value');
+        aulaInfo = s.val();
+        
+        if (aulaInfo) {
+          const tipoTexto = tipoRegistro === 'salida' ? '🚪 Salida' : '✅ Entrada';
+          document.getElementById('aulaInfo').textContent = `${aulaInfo.nombre} - ${tipoTexto}`;
+          console.log('✅ Aula cargada:', aulaInfo);
+        } else {
+          document.getElementById('aulaInfo').textContent = 'Aula no encontrada';
+          mostrarMensaje('❌ Aula no encontrada', 'error');
+        }
+      } catch (err) {
+        console.error('❌ Error:', err);
+        document.getElementById('aulaInfo').textContent = 'Error al cargar';
+        mostrarMensaje('❌ Error: ' + (err.message || 'No se pudo cargar el aula'), 'error');
+      }
+    }
+
+    function actualizarUITipo() {
+      const body = document.body;
+      const iconContainer = document.getElementById('iconContainer');
+      const tituloHeader = document.getElementById('tituloHeader');
+      const btnRegistrar = document.getElementById('btnRegistrar');
+      const btnTexto = document.getElementById('btnTexto');
+      const infoBox = document.getElementById('infoBox');
+      
+      if (tipoRegistro === 'salida') {
+        // Cambiar a tema rojo para salida
+        body.className = 'gradient-bg-salida min-h-screen py-8 px-4';
+        iconContainer.className = 'bg-gradient-to-br from-red-500 to-pink-600 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl animate-pulse-slow';
+        iconContainer.innerHTML = `
+          <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+        `;
+        tituloHeader.className = 'text-4xl font-extrabold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-2';
+        tituloHeader.textContent = 'Registro de Salida';
+        btnRegistrar.className = 'w-full btn-salida text-white py-6 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 shadow-2xl';
+        btnTexto.textContent = 'Registrar Salida';
+        btnRegistrar.innerHTML = `
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+          <span>Registrar Salida</span>
+        `;
+        infoBox.className = 'mt-6 bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-5 border-2 border-red-100';
+        infoBox.innerHTML = `
+          <p class="text-red-900 text-sm font-bold flex items-start gap-2">
+            <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Ingresa tu número de control para registrar tu salida. Asegúrate de haber registrado tu entrada primero.</span>
+          </p>
+        `;
+      } else {
+        // Mantener tema verde para entrada (por defecto)
+        btnTexto.textContent = 'Registrar Entrada';
+      }
     }
 
     /* ==== Validación input en tiempo real ==== */
@@ -250,9 +276,13 @@
         return mostrarMensaje('❌ El número de control debe tener exactamente 8 dígitos', 'error');
       }
       if (!aulaId) return mostrarMensaje('❌ Código de aula no válido', 'error');
-      if (!authReady) return mostrarMensaje('⏳ Esperando conexión...', 'error');
 
       try {
+        // Asegurar autenticación
+        if (!auth.currentUser) {
+          await auth.signInAnonymously();
+        }
+
         // 1) Asegurar que el aula existe
         const aulaSnap = await database.ref('aulas/' + aulaId).get();
         if (!aulaSnap.exists()) return mostrarMensaje('❌ Aula no encontrada', 'error');
@@ -275,43 +305,68 @@
           await dispRef.set(deviceId);
         }
 
-        // 4) Asistencia por fecha + numeroControl
+        // 4) Asistencia por fecha + numeroControl + tipo
         const ahora = new Date();
         const fechaKey = ahora.toLocaleDateString('es-MX').split('/').reverse().join('');
-        const refAsistencia = database.ref(`asistencias/${aulaId}/${fechaKey}/${numeroControl}`);
+        
+        // Guardar en estructura: asistencias/aulaId/fechaKey/numeroControl/tipo
+        const refRegistro = database.ref(`asistencias/${aulaId}/${fechaKey}/${numeroControl}/${tipoRegistro}`);
 
-        if ((await refAsistencia.get()).exists()) {
-          return mostrarMensaje('ℹ️ Ya registraste tu asistencia hoy en esta clase', 'error');
+        // Verificar si ya registró este tipo hoy
+        if ((await refRegistro.get()).exists()) {
+          const textoTipo = tipoRegistro === 'salida' ? 'salida' : 'entrada';
+          return mostrarMensaje(`ℹ️ Ya registraste tu ${textoTipo} hoy en esta clase`, 'error');
         }
 
-        // Guardar asistencia
         const registro = {
           numeroControl,
           nombre: alumno.nombre,
           fecha: fechaKey,
           hora: ahora.toLocaleTimeString('es-MX'),
           aula: aulaInfo?.nombre || '',
-          dispositivo: deviceId
+          dispositivo: deviceId,
+          tipo: tipoRegistro
         };
-        await refAsistencia.set(registro);
+        await refRegistro.set(registro);
 
         // 5) UI éxito
         document.getElementById('formulario').classList.add('hidden');
         document.getElementById('exitoMensaje').classList.remove('hidden');
-        document.getElementById('nombreExito').textContent = `Bienvenido(a), ${alumno.nombre}`;
-        mostrarMensaje(`🎉 ¡Bienvenido ${alumno.nombre}!`, 'success');
+        
+        const exitoIcon = document.getElementById('exitoIcon');
+        const exitoTitulo = document.getElementById('exitoTitulo');
+        const exitoDescripcion = document.getElementById('exitoDescripcion');
+        
+        if (tipoRegistro === 'salida') {
+          exitoIcon.className = 'bg-gradient-to-br from-red-500 to-pink-600 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl';
+          exitoIcon.innerHTML = `
+            <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M17 16l4-4m0 0l-4-4m4 4H7"></path>
+            </svg>
+          `;
+          exitoTitulo.textContent = '¡Hasta Pronto!';
+          exitoDescripcion.textContent = 'Tu salida ha sido registrada exitosamente';
+          document.getElementById('nombreExito').textContent = `Hasta pronto, ${alumno.nombre}`;
+          mostrarMensaje(`👋 ¡Hasta pronto ${alumno.nombre}!`, 'success');
+        } else {
+          document.getElementById('nombreExito').textContent = `Bienvenido(a), ${alumno.nombre}`;
+          mostrarMensaje(`🎉 ¡Bienvenido ${alumno.nombre}!`, 'success');
+        }
       } catch (error) {
-        console.error('❌ Error al registrar asistencia:', error);
-        mostrarMensaje('❌ Error al registrar asistencia. Intenta de nuevo.', 'error');
+        console.error('❌ Error al registrar:', error);
+        mostrarMensaje('❌ Error: ' + (error.message || 'Intenta de nuevo'), 'error');
       }
     }
 
     document.getElementById('btnRegistrar').addEventListener('click', verificarAlumno);
-    document.getElementById('numeroControl').addEventListener('keypress', e => { if (e.key === 'Enter') verificarAlumno(); });
+    document.getElementById('numeroControl').addEventListener('keypress', e => { 
+      if (e.key === 'Enter') verificarAlumno(); 
+    });
 
     window.addEventListener('load', () => {
       console.log('🚀 Página cargada');
       console.log('📱 Device ID:', getDeviceId());
+      cargarInfoAula();
     });
   </script>
 </body>
