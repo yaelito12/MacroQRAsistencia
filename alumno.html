@@ -11,6 +11,7 @@
 
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
   <style>
@@ -110,9 +111,10 @@
       measurementId: "G-WR5H7L26DH"
     };
 
-    let app, database;
+    let app, auth, database;
     try {
       app = firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
       database = firebase.database();
       console.log('✅ Firebase inicializado');
     } catch (e) {
@@ -166,8 +168,34 @@
     /* ==== Estado de la página ==== */
     let aulaId = null;
     let aulaInfo = null;
+    let authReady = false;
+
+    // CRÍTICO: Esperar a que la autenticación esté lista
+    auth.onAuthStateChanged(async (user) => {
+      console.log('🔐 Auth state changed:', user ? user.uid : 'no user');
+      
+      if (!user) {
+        console.log('🔑 Haciendo login anónimo...');
+        try {
+          await auth.signInAnonymously();
+          console.log('✅ Login anónimo exitoso');
+        } catch (error) {
+          console.error('❌ Error en login anónimo:', error);
+          mostrarMensaje('Error al conectar. Intenta recargar la página.', 'error');
+          return;
+        }
+      }
+      
+      authReady = true;
+      cargarInfoAula();
+    });
 
     function cargarInfoAula() {
+      if (!authReady) {
+        console.log('⏳ Esperando autenticación...');
+        return;
+      }
+
       aulaId = obtenerParametroURL('aula');
       console.log('🔍 Aula ID:', aulaId);
 
@@ -180,6 +208,7 @@
       database.ref('aulas/' + aulaId).once('value')
         .then(s => {
           aulaInfo = s.val();
+          console.log('📚 Aula cargada:', aulaInfo);
           if (aulaInfo) {
             document.getElementById('aulaInfo').textContent = aulaInfo.nombre || aulaId;
           } else {
@@ -221,18 +250,19 @@
         return mostrarMensaje('❌ El número de control debe tener exactamente 8 dígitos', 'error');
       }
       if (!aulaId) return mostrarMensaje('❌ Código de aula no válido', 'error');
+      if (!authReady) return mostrarMensaje('⏳ Esperando conexión...', 'error');
 
       try {
         // 1) Asegurar que el aula existe
         const aulaSnap = await database.ref('aulas/' + aulaId).get();
         if (!aulaSnap.exists()) return mostrarMensaje('❌ Aula no encontrada', 'error');
 
-        // 2) Leer SOLO el nodo del alumno (acorde a reglas nuevas)
+        // 2) Leer SOLO el nodo del alumno
         const alumnoSnap = await database.ref('alumnos/' + aulaId + '/' + numeroControl).get();
         const alumno = alumnoSnap.val();
         if (!alumno) return mostrarMensaje('❌ No estás registrado en esta clase. Contacta a tu profesor.', 'error');
 
-        // 3) Vincular dispositivo (solo primera vez o mismo device)
+        // 3) Vincular dispositivo
         const deviceId = getDeviceId();
         const dispRef = database.ref('dispositivos/' + aulaId + '/' + numeroControl);
         const dispSnap = await dispRef.get();
@@ -242,15 +272,14 @@
           return mostrarMensaje('❌ Este número de control ya está siendo usado en otro dispositivo', 'error');
         }
         if (!dispositivoRegistrado) {
-          await dispRef.set(deviceId); // permitido por reglas
+          await dispRef.set(deviceId);
         }
 
         // 4) Asistencia por fecha + numeroControl
         const ahora = new Date();
-        const fechaKey = ahora.toLocaleDateString('es-MX').split('/').reverse().join(''); // YYYYMMDD
+        const fechaKey = ahora.toLocaleDateString('es-MX').split('/').reverse().join('');
         const refAsistencia = database.ref(`asistencias/${aulaId}/${fechaKey}/${numeroControl}`);
 
-        // ¿Ya registró hoy?
         if ((await refAsistencia.get()).exists()) {
           return mostrarMensaje('ℹ️ Ya registraste tu asistencia hoy en esta clase', 'error');
         }
@@ -283,7 +312,6 @@
     window.addEventListener('load', () => {
       console.log('🚀 Página cargada');
       console.log('📱 Device ID:', getDeviceId());
-      cargarInfoAula();
     });
   </script>
 </body>
