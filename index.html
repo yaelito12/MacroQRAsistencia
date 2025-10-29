@@ -17,8 +17,8 @@
   <!-- QR -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   
-  <!-- SheetJS COMPLETO con soporte de estilos -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- ExcelJS - SOPORTA COLORES REALES -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 
   <style>
     * { font-family: 'Poppins', sans-serif; }
@@ -391,7 +391,7 @@
         .catch(()  => mostrarMensaje('No se pudo copiar la URL', 'error'));
     }
 
-    function exportarExcel(aulaId) {
+    async function exportarExcel(aulaId) {
       const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
       const fechaLegible = new Date().toLocaleDateString('es-MX', { 
         weekday: 'long', 
@@ -434,248 +434,156 @@
         return; 
       }
 
-      // Crear el workbook
-      const wb = XLSX.utils.book_new();
+      // CREAR WORKBOOK CON EXCELJS
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Asistencia');
+
+      // TÍTULO
+      worksheet.mergeCells('A1:E1');
+      const tituloCell = worksheet.getCell('A1');
+      tituloCell.value = `Reporte de Asistencia - ${aula?.nombre || 'Aula'}`;
+      tituloCell.font = { name: 'Calibri', size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
+      tituloCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+      tituloCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      worksheet.getRow(1).height = 30;
+
+      // SUBTÍTULO
+      worksheet.mergeCells('A2:E2');
+      const subtituloCell = worksheet.getCell('A2');
+      subtituloCell.value = fechaLegible;
+      subtituloCell.font = { name: 'Calibri', size: 12, italic: true, color: { argb: 'FF4B5563' } };
+      subtituloCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+      subtituloCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      worksheet.getRow(2).height = 25;
+
+      // FILA VACÍA
+      worksheet.addRow([]);
+
+      // ENCABEZADOS
+      const headerRow = worksheet.addRow(['N° Control', 'Nombre Completo', 'Hora Entrada', 'Hora Salida', 'Estado']);
+      const coloresEncabezado = ['FF6366F1', 'FF8B5CF6', 'FF10B981', 'FFEF4444', 'FFF59E0B'];
       
-      // Título y subtítulo
-      const titulo = [[`Reporte de Asistencia - ${aula?.nombre || 'Aula'}`]];
-      const subtitulo = [[fechaLegible]];
-      const espacio = [[]];
-      
-      // Encabezados
-      const headers = [['N° Control', 'Nombre Completo', 'Hora Entrada', 'Hora Salida', 'Estado']];
-      
-      // Datos con estado calculado
-      const datos = registros.map(r => {
-        let estado = '';
-        if (r.horaEntrada && r.horaSalida) {
-          estado = 'Completo ✓';
-        } else if (r.horaEntrada && !r.horaSalida) {
-          estado = 'Sin salida ⚠';
-        } else if (!r.horaEntrada && r.horaSalida) {
-          estado = 'Solo salida ⚠';
-        }
-        
-        return [
-          r.numeroControl || '',
-          r.nombre || 'Sin nombre',
-          r.horaEntrada || '--:--',
-          r.horaSalida || '--:--',
-          estado
-        ];
+      headerRow.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: coloresEncabezado[colNumber - 1] } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          top: { style: 'medium' },
+          bottom: { style: 'medium' },
+          left: { style: 'medium' },
+          right: { style: 'medium' }
+        };
       });
+      headerRow.height = 25;
+
+      // DATOS
+      registros.forEach((registro, index) => {
+        let estado = '';
+        let estadoColor = 'FFFFFFFF';
+        let estadoFontColor = 'FF1F2937';
+        
+        if (registro.horaEntrada && registro.horaSalida) {
+          estado = 'Completo ✓';
+          estadoColor = 'FFD1FAE5';
+          estadoFontColor = 'FF065F46';
+        } else if (registro.horaEntrada && !registro.horaSalida) {
+          estado = 'Sin salida ⚠';
+          estadoColor = 'FFFEF3C7';
+          estadoFontColor = 'FF92400E';
+        } else if (!registro.horaEntrada && registro.horaSalida) {
+          estado = 'Solo salida ⚠';
+          estadoColor = 'FFFEF3C7';
+          estadoFontColor = 'FF92400E';
+        }
+
+        const row = worksheet.addRow([
+          registro.numeroControl || '',
+          registro.nombre || 'Sin nombre',
+          registro.horaEntrada || '--:--',
+          registro.horaSalida || '--:--',
+          estado
+        ]);
+
+        const esFilaPar = index % 2 === 0;
+        const colorFila = esFilaPar ? 'FFF9FAFB' : 'FFFFFFFF';
+
+        row.eachCell((cell, colNumber) => {
+          cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF1F2937' } };
+          cell.alignment = { 
+            vertical: 'middle', 
+            horizontal: colNumber === 2 ? 'left' : 'center' 
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+          };
+
+          // Colores específicos por columna
+          if (colNumber === 3 && registro.horaEntrada !== '--:--' && registro.horaEntrada) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF065F46' } };
+          } else if (colNumber === 4 && registro.horaSalida !== '--:--' && registro.horaSalida) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF991B1B' } };
+          } else if (colNumber === 5) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: estadoColor } };
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: estadoFontColor } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorFila } };
+          }
+        });
+      });
+
+      // ESTADÍSTICAS
+      worksheet.addRow([]);
       
-      // Estadísticas
       const totalAlumnos = registros.length;
       const conEntrada = registros.filter(r => r.horaEntrada).length;
       const conSalida = registros.filter(r => r.horaSalida).length;
       const completos = registros.filter(r => r.horaEntrada && r.horaSalida).length;
-      
-      const estadisticas = [
-        [],
-        ['RESUMEN DE ASISTENCIA'],
+
+      const resumenRow = worksheet.addRow(['RESUMEN DE ASISTENCIA']);
+      worksheet.mergeCells(`A${resumenRow.number}:E${resumenRow.number}`);
+      const resumenCell = worksheet.getCell(`A${resumenRow.number}`);
+      resumenCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+      resumenCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+      resumenCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const statsData = [
         ['Total de registros:', totalAlumnos],
         ['Con entrada:', conEntrada],
         ['Con salida:', conSalida],
         ['Registros completos:', completos]
       ];
+
+      statsData.forEach(stat => {
+        const row = worksheet.addRow(stat);
+        row.getCell(1).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF374151' } };
+        row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        row.getCell(2).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1F2937' } };
+        row.getCell(2).alignment = { horizontal: 'center' };
+      });
+
+      // ANCHOS DE COLUMNA
+      worksheet.getColumn(1).width = 15;
+      worksheet.getColumn(2).width = 35;
+      worksheet.getColumn(3).width = 16;
+      worksheet.getColumn(4).width = 16;
+      worksheet.getColumn(5).width = 20;
+
+      // DESCARGAR
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
       
-      // Combinar datos
-      const wsData = [...titulo, ...subtitulo, ...espacio, ...headers, ...datos, ...estadisticas];
-      
-      // Crear worksheet
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      
-      // Anchos de columna
-      ws['!cols'] = [
-        { wch: 14 },
-        { wch: 35 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 20 }
-      ];
-      
-      // Combinar celdas
-      ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
-        { s: { r: 5 + datos.length, c: 0 }, e: { r: 5 + datos.length, c: 4 } }
-      ];
-      
-      // APLICAR ESTILOS
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      
-      // Función para crear estilo de celda
-      function crearEstilo(fill, font, border, alignment) {
-        return {
-          fill: fill || {},
-          font: font || {},
-          border: border || {},
-          alignment: alignment || {}
-        };
-      }
-      
-      // Bordes
-      const bordeGrueso = {
-        top: { style: "medium", color: { rgb: "000000" } },
-        bottom: { style: "medium", color: { rgb: "000000" } },
-        left: { style: "medium", color: { rgb: "000000" } },
-        right: { style: "medium", color: { rgb: "000000" } }
-      };
-      
-      const bordeFino = {
-        top: { style: "thin", color: { rgb: "D1D5DB" } },
-        bottom: { style: "thin", color: { rgb: "D1D5DB" } },
-        left: { style: "thin", color: { rgb: "D1D5DB" } },
-        right: { style: "thin", color: { rgb: "D1D5DB" } }
-      };
-      
-      // Estilizar TÍTULO (Fila 0)
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const address = XLSX.utils.encode_cell({ r: 0, c: C });
-        if (!ws[address]) continue;
-        ws[address].s = crearEstilo(
-          { fgColor: { rgb: "4F46E5" } },
-          { bold: true, sz: 18, color: { rgb: "FFFFFF" } },
-          bordeGrueso,
-          { horizontal: "center", vertical: "center" }
-        );
-      }
-      
-      // Estilizar SUBTÍTULO (Fila 1)
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const address = XLSX.utils.encode_cell({ r: 1, c: C });
-        if (!ws[address]) continue;
-        ws[address].s = crearEstilo(
-          { fgColor: { rgb: "E5E7EB" } },
-          { sz: 12, italic: true, color: { rgb: "4B5563" } },
-          bordeFino,
-          { horizontal: "center", vertical: "center" }
-        );
-      }
-      
-      // Estilizar ENCABEZADOS (Fila 3, índice 3)
-      const coloresEncabezado = [
-        "6366F1", // N° Control
-        "8B5CF6", // Nombre
-        "10B981", // Entrada
-        "EF4444", // Salida
-        "F59E0B"  // Estado
-      ];
-      
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const address = XLSX.utils.encode_cell({ r: 3, c: C });
-        if (!ws[address]) continue;
-        ws[address].s = crearEstilo(
-          { fgColor: { rgb: coloresEncabezado[C] } },
-          { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
-          bordeGrueso,
-          { horizontal: "center", vertical: "center" }
-        );
-      }
-      
-      // Estilizar DATOS (Filas 4 en adelante hasta antes de estadísticas)
-      const filaInicioDatos = 4;
-      const filaFinDatos = 4 + datos.length - 1;
-      
-      for (let R = filaInicioDatos; R <= filaFinDatos; ++R) {
-        const esFilaPar = (R - filaInicioDatos) % 2 === 0;
-        
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const address = XLSX.utils.encode_cell({ r: R, c: C });
-          if (!ws[address]) continue;
-          
-          let fillColor = esFilaPar ? "F9FAFB" : "FFFFFF";
-          let fontColor = "1F2937";
-          let fontBold = false;
-          const idx = R - filaInicioDatos;
-          
-          // Columna Hora Entrada (C=2)
-          if (C === 2 && datos[idx] && datos[idx][2] !== '--:--') {
-            fillColor = "D1FAE5";
-            fontColor = "065F46";
-            fontBold = true;
-          }
-          
-          // Columna Hora Salida (C=3)
-          if (C === 3 && datos[idx] && datos[idx][3] !== '--:--') {
-            fillColor = "FEE2E2";
-            fontColor = "991B1B";
-            fontBold = true;
-          }
-          
-          // Columna Estado (C=4)
-          if (C === 4 && datos[idx]) {
-            if (datos[idx][4].includes('Completo')) {
-              fillColor = "D1FAE5";
-              fontColor = "065F46";
-              fontBold = true;
-            } else if (datos[idx][4].includes('Sin salida') || datos[idx][4].includes('Solo salida')) {
-              fillColor = "FEF3C7";
-              fontColor = "92400E";
-              fontBold = true;
-            }
-          }
-          
-          ws[address].s = crearEstilo(
-            { fgColor: { rgb: fillColor } },
-            { sz: 11, color: { rgb: fontColor }, bold: fontBold },
-            bordeFino,
-            { horizontal: C === 1 ? "left" : "center", vertical: "center" }
-          );
-        }
-      }
-      
-      // Estilizar RESUMEN (después de una fila vacía)
-      const filaResumenInicio = filaFinDatos + 2;
-      
-      // Título del resumen
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const address = XLSX.utils.encode_cell({ r: filaResumenInicio, c: C });
-        if (!ws[address]) continue;
-        ws[address].s = crearEstilo(
-          { fgColor: { rgb: "059669" } },
-          { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
-          bordeGrueso,
-          { horizontal: "center", vertical: "center" }
-        );
-      }
-      
-      // Filas de estadísticas
-      for (let i = 1; i <= 4; i++) {
-        const R = filaResumenInicio + i;
-        
-        // Columna A (etiqueta)
-        const addressLabel = XLSX.utils.encode_cell({ r: R, c: 0 });
-        if (ws[addressLabel]) {
-          ws[addressLabel].s = crearEstilo(
-            { fgColor: { rgb: "E5E7EB" } },
-            { bold: true, sz: 11, color: { rgb: "374151" } },
-            bordeFino,
-            { horizontal: "left", vertical: "center" }
-          );
-        }
-        
-        // Columna B (valor)
-        const addressValue = XLSX.utils.encode_cell({ r: R, c: 1 });
-        if (ws[addressValue]) {
-          ws[addressValue].s = crearEstilo(
-            { fgColor: { rgb: "FFFFFF" } },
-            { bold: true, sz: 11, color: { rgb: "1F2937" } },
-            bordeFino,
-            { horizontal: "center", vertical: "center" }
-          );
-        }
-      }
-      
-      // Agregar worksheet al workbook
-      XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
-      
-      // Generar archivo
-      const nombreArchivo = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.xlsx`;
-      XLSX.writeFile(wb, nombreArchivo);
-      
-      mostrarMensaje('Excel descargado con formato profesional', 'success');
+      mostrarMensaje('✅ Excel con colores descargado exitosamente', 'success');
     }
 
     function renderizarAulas() {
@@ -904,5 +812,3 @@
   </script>
 </body>
 </html>
-
-
