@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -270,7 +269,8 @@
       mostrarMensaje('Sesión cerrada', 'success');
     });
 
- async function crearAula() {
+    /* ==== Aulas ==== */
+    async function crearAula() {
       console.log('🔵 crearAula() llamada');
       if (!currentUID) {
         mostrarMensaje('Debes iniciar sesión primero', 'error');
@@ -305,7 +305,7 @@
         mostrarMensaje('Error al crear el aula: ' + (error.message || error), 'error');
       }
     }
-    // IMPORTANTE: Conectar el botón con la función
+
     $('btnNuevaAula').addEventListener('click', () => {
       console.log('🟢 Botón Nueva Aula presionado');
       crearAula();
@@ -398,8 +398,7 @@
         </div>
       `).join('');
     }
-
-    /* ==== Asistencias / Aulas UI ==== */
+      /* ==== Asistencias / Aulas UI ==== */
     function copiarURL(aulaId) {
       const urlCompleta = urlDeSesion(aulaId);
       navigator.clipboard.writeText(urlCompleta)
@@ -410,12 +409,29 @@
     function exportarExcel(aulaId) {
       const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
       const aula = aulas[aulaId];
-      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
-      const registros = Object.values(registrosObj);
-      if (registros.length === 0) { mostrarMensaje('No hay registros para exportar', 'error'); return; }
+      const registrosHoyObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
+      
+      // Aplanar la estructura anidada
+      let registros = [];
+      Object.keys(registrosHoyObj).forEach(numeroControl => {
+        const tiposRegistro = registrosHoyObj[numeroControl];
+        Object.keys(tiposRegistro).forEach(tipo => {
+          const registro = tiposRegistro[tipo];
+          if (typeof registro === 'object') {
+            registros.push(registro);
+          }
+        });
+      });
+      
+      if (registros.length === 0) { 
+        mostrarMensaje('No hay registros para exportar', 'error'); 
+        return; 
+      }
 
-      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora\n';
-      registros.forEach(r => { csv += `${r.numeroControl},"${r.nombre}",${r.fecha},${r.hora}\n`; });
+      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora,Tipo\n';
+      registros.forEach(r => { 
+        csv += `${r.numeroControl || ''},"${r.nombre || 'Sin nombre'}",${r.fecha || ''},${r.hora || ''},${r.tipo || 'entrada'}\n`; 
+      });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -442,7 +458,18 @@
       container.innerHTML = aulasArray.map((aula, index) => {
         const alumnosAula = Object.values((alumnosRegistrados && alumnosRegistrados[aula.id]) || {});
         const registrosHoyObj = (asistencias[aula.id] && asistencias[aula.id][fechaKey]) || {};
-        const registrosHoy = Object.values(registrosHoyObj);
+        
+        // Procesar registros de hoy - aplanar la estructura anidada
+        let registrosHoy = [];
+        Object.keys(registrosHoyObj).forEach(numeroControl => {
+          const tiposRegistro = registrosHoyObj[numeroControl];
+          Object.keys(tiposRegistro).forEach(tipo => {
+            const registros = tiposRegistro[tipo];
+            if (typeof registros === 'object') {
+              registrosHoy.push(registros);
+            }
+          });
+        });
 
         const ultimos = registrosHoy.slice(-5).reverse();
 
@@ -485,8 +512,8 @@
                 <div class="space-y-2 max-h-32 overflow-y-auto">
                   ${ultimos.map(reg => `
                     <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
-                      <span class="font-semibold text-gray-800">${reg.nombre}</span>
-                      <span class="text-gray-600">${reg.hora}</span>
+                      <span class="font-semibold text-gray-800">${reg.nombre || 'Sin nombre'}</span>
+                      <span class="text-gray-600">${reg.hora || '--:--'}</span>
                     </div>
                   `).join('')}
                 </div>
@@ -510,7 +537,7 @@
         `;
       }).join('');
 
-      // Generar QR después de insertar HTML (pequeña espera para que el DOM esté listo)
+      // Generar QR después de insertar HTML
       setTimeout(() => {
         aulasArray.forEach(aula => {
           const div = document.getElementById(`qr-${aula.id}`);
