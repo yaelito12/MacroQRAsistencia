@@ -1,4 +1,4 @@
-<!-- ...existing code... -->
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -270,8 +270,7 @@
       mostrarMensaje('Sesión cerrada', 'success');
     });
 
-    /* ==== Aulas ==== */
-    async function crearAula() {
+ async function crearAula() {
       console.log('🔵 crearAula() llamada');
       if (!currentUID) {
         mostrarMensaje('Debes iniciar sesión primero', 'error');
@@ -299,9 +298,6 @@
 
         console.log('📤 Guardando aula:', payload);
         await refAula.set(payload);
-        // inicializar estructuras
-        await database.ref('asistencias/' + aulaId).set({});
-        await database.ref('alumnos/' + aulaId).set({});
         mostrarMensaje('Aula creada exitosamente', 'success');
         console.log('✅ Aula creada:', payload);
       } catch (error) {
@@ -309,7 +305,6 @@
         mostrarMensaje('Error al crear el aula: ' + (error.message || error), 'error');
       }
     }
-
     // IMPORTANTE: Conectar el botón con la función
     $('btnNuevaAula').addEventListener('click', () => {
       console.log('🟢 Botón Nueva Aula presionado');
