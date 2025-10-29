@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -16,6 +17,9 @@
 
   <!-- QR -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  
+  <!-- SheetJS para Excel con formato -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
   <style>
     * { font-family: 'Poppins', sans-serif; }
@@ -396,6 +400,12 @@
 
     function exportarExcel(aulaId) {
       const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+      const fechaLegible = new Date().toLocaleDateString('es-MX', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
       const aula = aulas[aulaId];
       const registrosHoyObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
       
@@ -408,7 +418,6 @@
           alumnosUnificados[numeroControl] = {
             numeroControl: numeroControl,
             nombre: '',
-            fecha: fechaKey,
             horaEntrada: '',
             horaSalida: ''
           };
@@ -432,16 +441,113 @@
         return; 
       }
 
-      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora Entrada,Hora Salida\n';
-      registros.forEach(r => { 
-        csv += `${r.numeroControl || ''},"${r.nombre || 'Sin nombre'}",${r.fecha || ''},${r.horaEntrada || '--:--'},${r.horaSalida || '--:--'}\n`; 
+      // Crear el workbook y worksheet
+      const wb = XLSX.utils.book_new();
+      
+      // Datos de encabezado con información del aula
+      const titulo = [[`Reporte de Asistencia - ${aula?.nombre || 'Aula'}`]];
+      const subtitulo = [[fechaLegible]];
+      const espacio = [[]];
+      
+      // Encabezados de las columnas
+      const headers = [['N° Control', 'Nombre Completo', 'Hora Entrada', 'Hora Salida', 'Estado']];
+      
+      // Datos de los alumnos con cálculo de estado
+      const datos = registros.map(r => {
+        let estado = '';
+        if (r.horaEntrada && r.horaSalida) {
+          estado = 'Completo ✓';
+        } else if (r.horaEntrada && !r.horaSalida) {
+          estado = 'Sin salida ⚠';
+        } else if (!r.horaEntrada && r.horaSalida) {
+          estado = 'Solo salida ⚠';
+        }
+        
+        return [
+          r.numeroControl || '',
+          r.nombre || 'Sin nombre',
+          r.horaEntrada || '--:--',
+          r.horaSalida || '--:--',
+          estado
+        ];
       });
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.csv`;
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-      mostrarMensaje('Archivo descargado exitosamente', 'success');
+      
+      // Estadísticas
+      const totalAlumnos = registros.length;
+      const conEntrada = registros.filter(r => r.horaEntrada).length;
+      const conSalida = registros.filter(r => r.horaSalida).length;
+      const completos = registros.filter(r => r.horaEntrada && r.horaSalida).length;
+      
+      const estadisticas = [
+        [],
+        ['RESUMEN DE ASISTENCIA'],
+        ['Total de registros:', totalAlumnos],
+        ['Con entrada:', conEntrada],
+        ['Con salida:', conSalida],
+        ['Registros completos:', completos]
+      ];
+      
+      // Combinar todos los datos
+      const wsData = [...titulo, ...subtitulo, ...espacio, ...headers, ...datos, ...estadisticas];
+      
+      // Crear la hoja de cálculo
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // Configurar anchos de columna
+      ws['!cols'] = [
+        { wch: 12 },  // N° Control
+        { wch: 30 },  // Nombre
+        { wch: 15 },  // Hora Entrada
+        { wch: 15 },  // Hora Salida
+        { wch: 18 }   // Estado
+      ];
+      
+      // Combinar celdas para el título
+      ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // Título
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }  // Subtítulo
+      ];
+      
+      // Aplicar estilos básicos usando propiedades de celda
+      // Título
+      if (!ws['A1']) ws['A1'] = {};
+      ws['A1'].s = {
+        font: { bold: true, sz: 16, color: { rgb: "4F46E5" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        fill: { fgColor: { rgb: "E0E7FF" } }
+      };
+      
+      // Subtítulo
+      if (!ws['A2']) ws['A2'] = {};
+      ws['A2'].s = {
+        font: { sz: 12, italic: true },
+        alignment: { horizontal: "center" }
+      };
+      
+      // Encabezados de columnas (fila 4)
+      ['A4', 'B4', 'C4', 'D4', 'E4'].forEach(cell => {
+        if (!ws[cell]) ws[cell] = { v: '' };
+        ws[cell].s = {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { fgColor: { rgb: "4F46E5" } },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
+        };
+      });
+      
+      // Agregar la hoja al libro
+      XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
+      
+      // Generar el archivo
+      const nombreArchivo = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.xlsx`;
+      XLSX.writeFile(wb, nombreArchivo);
+      
+      mostrarMensaje('Archivo Excel descargado exitosamente', 'success');
     }
 
     function renderizarAulas() {
