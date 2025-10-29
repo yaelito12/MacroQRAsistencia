@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -336,18 +337,11 @@
           creadoEn: Date.now()
         };
 
-        console.log('📤 Guardando aula:', payload);
+        console.log('📤 Guardando aula en Firebase:', payload);
         await refAula.set(payload);
         
-        // Agregar manualmente al objeto local para renderizar inmediatamente
-        aulas[aulaId] = payload;
-        console.log('✅ Aula agregada al objeto local:', aulas);
-        
-        // Forzar renderizado
-        renderizarAulas();
-        
         mostrarMensaje('Aula creada exitosamente', 'success');
-        console.log('✅ Aula creada y renderizada:', payload);
+        console.log('✅ Aula guardada en Firebase. El listener la detectará automáticamente.');
       } catch (error) {
         console.error('❌ Error al crear aula:', error);
         mostrarMensaje('Error al crear el aula: ' + (error.message || error), 'error');
@@ -678,39 +672,33 @@
       // Filtrar aulas por usuario autenticado
       database.ref('aulas').on('value', (s) => {
         const todasLasAulas = s.val() || {};
-        console.log('📚 Todas las aulas recibidas:', todasLasAulas);
-        console.log('📚 Cantidad total de aulas:', Object.keys(todasLasAulas).length);
+        console.log('📚 Firebase: Aulas recibidas del servidor');
+        console.log('📚 Cantidad total de aulas en Firebase:', Object.keys(todasLasAulas).length);
         
         // Filtrar solo las aulas creadas por el usuario actual
-        aulas = {};
+        const aulasNuevas = {};
         Object.keys(todasLasAulas).forEach(key => {
-          console.log(`🔍 Revisando aula ${key}:`, todasLasAulas[key]);
-          console.log(`  - creadoPor: ${todasLasAulas[key].creadoPor}`);
-          console.log(`  - currentUID: ${currentUID}`);
-          console.log(`  - ¿Coincide?: ${todasLasAulas[key].creadoPor === currentUID}`);
-          
           if (todasLasAulas[key].creadoPor === currentUID) {
-            aulas[key] = todasLasAulas[key];
-            console.log('✅ Aula agregada al filtro:', key, todasLasAulas[key]);
-          } else {
-            console.log('❌ Aula NO agregada (diferente usuario)');
+            aulasNuevas[key] = todasLasAulas[key];
+            console.log('✅ Aula del usuario encontrada:', key, todasLasAulas[key].nombre);
           }
         });
         
-        console.log('🎯 Aulas filtradas para este usuario:', Object.keys(aulas).length);
-        console.log('🎯 Aulas objeto:', aulas);
+        aulas = aulasNuevas;
+        console.log('🎯 Total aulas filtradas:', Object.keys(aulas).length);
+        console.log('🎯 Objeto aulas:', aulas);
+        
+        console.log('🎨 Llamando a renderizarAulas()...');
         renderizarAulas();
       });
       
       database.ref('alumnos').on('value', (s) => {
         alumnosRegistrados = s.val() || {};
         if (aulaSeleccionada) renderizarAlumnos();
-        renderizarAulas();
       });
       
       database.ref('asistencias').on('value', (s) => { 
         asistencias = s.val() || {}; 
-        renderizarAulas(); 
       });
       
       console.log('✅ Listeners inicializados correctamente');
