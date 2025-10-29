@@ -1,4 +1,3 @@
-<!-- ...existing code... -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -216,14 +215,24 @@
       const dd = String(d.getDate()).padStart(2,'0');
       return `${aulaId}-${yyyy}${mm}${dd}`;
     }
-function urlDeSesion(aulaId, tipo = 'entrada'){
-  const sid = buildSessionId(aulaId);
-  return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}&tipo=${tipo}`;
-}
+
+    function urlDeSesion(aulaId, tipo = 'entrada'){
+      const sid = buildSessionId(aulaId);
+      return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}&tipo=${tipo}`;
+    }
+
     function renderQR(div, dataUrl){
       div.innerHTML = '';
-      new QRCode(div, { text: dataUrl, width: 300, height: 300, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+      new QRCode(div, { 
+        text: dataUrl, 
+        width: 200, 
+        height: 200, 
+        colorDark: "#000000", 
+        colorLight: "#ffffff", 
+        correctLevel: QRCode.CorrectLevel.H 
+      });
     }
+
     function validarNumeroControl(num) { return /^\d{8}$/.test(num); }
     function validarNombre(nombre) { return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre); }
 
@@ -240,16 +249,24 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
         return;
       }
       currentUID = user.uid;
+      console.log('👤 Usuario autenticado:', currentUID);
       $('whoami').textContent = `UID: ${currentUID}`;
+      
       const isAdmin = await checkIsAdmin(currentUID);
+      console.log('🔐 Es admin:', isAdmin);
+      
       if (!isAdmin) {
         $('loginCard').classList.remove('hidden');
         $('panel').classList.add('hidden');
         mostrarMensaje('Tu cuenta no tiene permisos de profesor. Pide que te agreguen en admins/{uid}.', 'error');
         return;
       }
+      
       $('loginCard').classList.add('hidden');
       $('panel').classList.remove('hidden');
+      
+      // Inicializar listeners DESPUÉS de autenticar
+      inicializarListeners();
     });
 
     $('btnLogin').addEventListener('click', async () => {
@@ -297,18 +314,24 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
           creadoEn: Date.now()
         };
 
-         console.log('📤 Guardando aula:', payload);
+        console.log('📤 Guardando aula:', payload);
         await refAula.set(payload);
-        // NO inicializar alumnos manualmente - se creará automáticamente al agregar el primer alumno
+        
+        // Agregar manualmente al objeto local para renderizar inmediatamente
+        aulas[aulaId] = payload;
+        console.log('✅ Aula agregada al objeto local:', aulas);
+        
+        // Forzar renderizado
+        renderizarAulas();
+        
         mostrarMensaje('Aula creada exitosamente', 'success');
-        console.log('✅ Aula creada:', payload);
+        console.log('✅ Aula creada y renderizada:', payload);
       } catch (error) {
         console.error('❌ Error al crear aula:', error);
         mostrarMensaje('Error al crear el aula: ' + (error.message || error), 'error');
       }
     }
 
-    // IMPORTANTE: Conectar el botón con la función
     $('btnNuevaAula').addEventListener('click', () => {
       console.log('🟢 Botón Nueva Aula presionado');
       crearAula();
@@ -323,17 +346,20 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
       document.body.style.overflow = 'hidden';
       renderizarAlumnos();
     }
+
     function cerrarModal() {
       $('modalAlumnos').classList.add('hidden');
       document.body.style.overflow = 'auto';
       $('buscarAlumno').value = '';
       aulaSeleccionada = null;
     }
+
     $('btnCerrarModal').addEventListener('click', cerrarModal);
 
     $('nuevoNumControl').addEventListener('input', function(e) {
       this.value = this.value.replace(/\D/g, '').substring(0, 8);
     });
+
     $('nuevoNombre').addEventListener('input', function(e) {
       this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
     });
@@ -367,39 +393,6 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
       mostrarMensaje('Alumno eliminado', 'success');
     }
 
-    function obtenerRegistrosHoy(aulaId, fechaKey) {
-      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
-      let registros = [];
-      
-      Object.keys(registrosObj).forEach(numeroControl => {
-        const alumnoData = registrosObj[numeroControl];
-        
-        // Agregar entrada si existe
-        if (alumnoData.entrada) {
-          registros.push({
-            ...alumnoData.entrada,
-            tipo: 'entrada'
-          });
-        }
-        
-        // Agregar salida si existe
-        if (alumnoData.salida) {
-          registros.push({
-            ...alumnoData.salida,
-            tipo: 'salida'
-          });
-        }
-      });
-      
-      // Ordenar por hora (más reciente primero)
-      registros.sort((a, b) => {
-        const timeA = a.hora || '00:00:00';
-        const timeB = b.hora || '00:00:00';
-        return timeB.localeCompare(timeA);
-      });
-      
-      return registros;
-    }
     function renderizarAlumnos() {
       const buscar = $('buscarAlumno').value.toLowerCase();
       const alumnosObj = (alumnosRegistrados && alumnosRegistrados[aulaSeleccionada]) || {};
@@ -436,55 +429,63 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
     }
 
     /* ==== Asistencias / Aulas UI ==== */
-function copiarURL(aulaId, tipo = 'entrada') {
-  const urlCompleta = urlDeSesion(aulaId, tipo);
-  navigator.clipboard.writeText(urlCompleta)
-    .then(() => mostrarMensaje(`URL de ${tipo} copiada al portapapeles`, 'success'))
-    .catch(()  => mostrarMensaje('No se pudo copiar la URL', 'error'));
-}
+    function copiarURL(aulaId, tipo = 'entrada') {
+      const urlCompleta = urlDeSesion(aulaId, tipo);
+      navigator.clipboard.writeText(urlCompleta)
+        .then(() => mostrarMensaje(`URL de ${tipo} copiada al portapapeles`, 'success'))
+        .catch(()  => mostrarMensaje('No se pudo copiar la URL', 'error'));
+    }
 
-   function exportarExcel(aulaId) {
-  const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
-  const aula = aulas[aulaId];
-  const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
-  
-  let registros = [];
-  Object.keys(registrosObj).forEach(numeroControl => {
-    const alumnoData = registrosObj[numeroControl];
-    const entrada = alumnoData.entrada || null;
-    const salida = alumnoData.salida || null;
-    
-    registros.push({
-      numeroControl,
-      nombre: entrada?.nombre || salida?.nombre || '—',
-      entrada: entrada?.hora || '—',
-      salida: salida?.hora || '—'
-    });
-  });
-  
-  if (registros.length === 0) { 
-    mostrarMensaje('No hay registros para exportar', 'error'); 
-    return; 
-  }
+    function exportarExcel(aulaId) {
+      const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+      const aula = aulas[aulaId];
+      const registrosObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
+      
+      let registros = [];
+      Object.keys(registrosObj).forEach(numeroControl => {
+        const alumnoData = registrosObj[numeroControl];
+        const entrada = alumnoData.entrada || null;
+        const salida = alumnoData.salida || null;
+        
+        registros.push({
+          numeroControl,
+          nombre: entrada?.nombre || salida?.nombre || '—',
+          entrada: entrada?.hora || '—',
+          salida: salida?.hora || '—'
+        });
+      });
+      
+      if (registros.length === 0) { 
+        mostrarMensaje('No hay registros para exportar', 'error'); 
+        return; 
+      }
 
-  let csv = '\uFEFFNúmero de Control,Nombre,Entrada,Salida\n';
-  registros.forEach(r => { 
-    csv += `${r.numeroControl},"${r.nombre}",${r.entrada},${r.salida}\n`; 
-  });
-  
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.csv`;
-  document.body.appendChild(link); 
-  link.click(); 
-  document.body.removeChild(link);
-  mostrarMensaje('Archivo descargado exitosamente', 'success');
-}
+      let csv = '\uFEFFNúmero de Control,Nombre,Entrada,Salida\n';
+      registros.forEach(r => { 
+        csv += `${r.numeroControl},"${r.nombre}",${r.entrada},${r.salida}\n`; 
+      });
+      
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Asistencia_${(aula?.nombre||'Aula').replace(/\s/g,'_')}_${fechaKey}.csv`;
+      document.body.appendChild(link); 
+      link.click(); 
+      document.body.removeChild(link);
+      mostrarMensaje('Archivo descargado exitosamente', 'success');
+    }
+
     function renderizarAulas() {
+      console.log('🎨 renderizarAulas() llamado');
+      console.log('📊 Aulas a renderizar:', Object.keys(aulas).length);
+      
       const container = $('aulasContainer');
       const aulasArray = Object.values(aulas || {});
+      
+      console.log('📋 Array de aulas:', aulasArray);
+      
       if (aulasArray.length === 0) {
+        console.log('⚠️ No hay aulas para mostrar');
         container.innerHTML = `
           <div class="col-span-full card-glass rounded-3xl shadow-2xl p-8 sm:p-12 text-center animate-fade-in">
             <div class="text-7xl sm:text-8xl mb-6">📚</div>
@@ -495,6 +496,7 @@ function copiarURL(aulaId, tipo = 'entrada') {
       }
 
       const fechaKey = new Date().toLocaleDateString('es-MX').split('/').reverse().join('');
+      console.log('📅 Fecha key:', fechaKey);
 
       container.innerHTML = aulasArray.map((aula, index) => {
         const alumnosAula = Object.values((alumnosRegistrados && alumnosRegistrados[aula.id]) || {});
@@ -511,26 +513,26 @@ function copiarURL(aulaId, tipo = 'entrada') {
               </svg>
             </button>
             <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 pr-10">${aula.nombre}</h3>
-           <div class="qr-container rounded-2xl p-4 sm:p-6 mb-4 shadow-inner">
-  <div class="grid grid-cols-2 gap-4 mb-3">
-    <div>
-      <p class="text-center text-xs font-bold text-green-700 mb-2">ENTRADA</p>
-      <div id="qr-entrada-${aula.id}" class="mx-auto flex items-center justify-center bg-white p-2 rounded-lg"></div>
-    </div>
-    <div>
-      <p class="text-center text-xs font-bold text-red-700 mb-2">SALIDA</p>
-      <div id="qr-salida-${aula.id}" class="mx-auto flex items-center justify-center bg-white p-2 rounded-lg"></div>
-    </div>
-  </div>
-  <div class="grid grid-cols-2 gap-2">
-    <button onclick="copiarURL('${aula.id}', 'entrada')" class="bg-green-500 text-white py-2 px-3 rounded-lg font-bold text-xs hover:bg-green-600 transition-all">
-      Copiar Entrada
-    </button>
-    <button onclick="copiarURL('${aula.id}', 'salida')" class="bg-red-500 text-white py-2 px-3 rounded-lg font-bold text-xs hover:bg-red-600 transition-all">
-      Copiar Salida
-    </button>
-  </div>
-</div>
+            <div class="qr-container rounded-2xl p-4 sm:p-6 mb-4 shadow-inner">
+              <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <p class="text-center text-xs font-bold text-green-700 mb-2">ENTRADA</p>
+                  <div id="qr-entrada-${aula.id}" class="mx-auto flex items-center justify-center bg-white p-2 rounded-lg"></div>
+                </div>
+                <div>
+                  <p class="text-center text-xs font-bold text-red-700 mb-2">SALIDA</p>
+                  <div id="qr-salida-${aula.id}" class="mx-auto flex items-center justify-center bg-white p-2 rounded-lg"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <button onclick="copiarURL('${aula.id}', 'entrada')" class="bg-green-500 text-white py-2 px-3 rounded-lg font-bold text-xs hover:bg-green-600 transition-all">
+                  Copiar Entrada
+                </button>
+                <button onclick="copiarURL('${aula.id}', 'salida')" class="bg-red-500 text-white py-2 px-3 rounded-lg font-bold text-xs hover:bg-red-600 transition-all">
+                  Copiar Salida
+                </button>
+              </div>
+            </div>
             <div class="grid grid-cols-2 gap-3 mb-4">
               <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
                 <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Alumnos</p>
@@ -577,15 +579,34 @@ function copiarURL(aulaId, tipo = 'entrada') {
         `;
       }).join('');
 
-      // Generar QR después de insertar HTML (pequeña espera para que el DOM esté listo)
-  setTimeout(() => {
-  aulasArray.forEach(aula => {
-    const divEntrada = document.getElementById(`qr-entrada-${aula.id}`);
-    const divSalida = document.getElementById(`qr-salida-${aula.id}`);
-    if (divEntrada) renderQR(divEntrada, urlDeSesion(aula.id, 'entrada'));
-    if (divSalida) renderQR(divSalida, urlDeSesion(aula.id, 'salida'));
-  });
-}, 100);
+      console.log('✅ HTML renderizado, generando QRs...');
+      
+      // Generar QR inmediatamente después de que el HTML esté en el DOM
+      setTimeout(() => {
+        aulasArray.forEach(aula => {
+          const divEntrada = document.getElementById(`qr-entrada-${aula.id}`);
+          const divSalida = document.getElementById(`qr-salida-${aula.id}`);
+          
+          console.log(`🔍 Generando QR para aula: ${aula.nombre} (${aula.id})`);
+          
+          if (divEntrada) {
+            const urlEntrada = urlDeSesion(aula.id, 'entrada');
+            console.log(`  ✅ Generando QR Entrada: ${urlEntrada}`);
+            renderQR(divEntrada, urlEntrada);
+          } else {
+            console.error(`  ❌ No se encontró div entrada para aula: ${aula.id}`);
+          }
+          
+          if (divSalida) {
+            const urlSalida = urlDeSesion(aula.id, 'salida');
+            console.log(`  ✅ Generando QR Salida: ${urlSalida}`);
+            renderQR(divSalida, urlSalida);
+          } else {
+            console.error(`  ❌ No se encontró div salida para aula: ${aula.id}`);
+          }
+        });
+        console.log('🎉 Todos los QRs generados');
+      }, 300);
     }
 
     function eliminarAula(aulaId) {
@@ -602,7 +623,7 @@ function copiarURL(aulaId, tipo = 'entrada') {
     window.exportarExcel = exportarExcel;
     window.eliminarAula = eliminarAula;
 
-  /* ==== Subscripciones DB ==== */
+    /* ==== Subscripciones DB ==== */
     function inicializarListeners() {
       console.log('🔄 Inicializando listeners para usuario:', currentUID);
       
