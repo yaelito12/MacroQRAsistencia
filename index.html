@@ -30,6 +30,7 @@
     .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); transition: all 0.3s ease; }
     .btn-primary:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4); }
     .qr-container { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+    .qr-salida { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); }
     @media (max-width: 768px){ h1 { font-size: 1.75rem !important; } }
   </style>
 </head>
@@ -215,20 +216,33 @@
       const dd = String(d.getDate()).padStart(2,'0');
       return `${aulaId}-${yyyy}${mm}${dd}`;
     }
-    function urlDeSesion(aulaId){
+    
+    function urlDeSesion(aulaId, tipo = 'entrada'){
       const sid = buildSessionId(aulaId);
-      return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}`;
+      return `${URL_ALUMNO}?aula=${encodeURIComponent(aulaId)}&sid=${encodeURIComponent(sid)}&tipo=${tipo}`;
     }
+    
     function renderQR(div, dataUrl){
       div.innerHTML = '';
       new QRCode(div, { text: dataUrl, width: 300, height: 300, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
     }
+    
     function validarNumeroControl(num) { return /^\d{8}$/.test(num); }
     function validarNombre(nombre) { return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre); }
 
     async function checkIsAdmin(uid){
       const snap = await database.ref('admins/'+uid).get();
       return snap.exists() && snap.val() === true;
+    }
+
+    // Nueva función para verificar nombres de aula únicos
+    async function verificarNombreAulaUnico(nombre) {
+      const nombreNormalizado = nombre.trim().toLowerCase();
+      const aulasArray = Object.values(aulas || {});
+      
+      return !aulasArray.some(aula => 
+        aula.nombre.trim().toLowerCase() === nombreNormalizado
+      );
     }
 
     /* ==== Auth ==== */
@@ -264,6 +278,13 @@
       
       if (!nombre || nombre.trim() === '') {
         mostrarMensaje('Nombre de aula inválido', 'error');
+        return;
+      }
+
+      // Verificar que el nombre sea único
+      const esUnico = await verificarNombreAulaUnico(nombre);
+      if (!esUnico) {
+        mostrarMensaje('Ya existe un aula con ese nombre. Por favor elige otro nombre.', 'error');
         return;
       }
 
@@ -366,10 +387,10 @@
     }
 
     /* ==== Asistencias / Aulas UI ==== */
-    function copiarURL(aulaId) {
-      const urlCompleta = urlDeSesion(aulaId);
+    function copiarURL(aulaId, tipo = 'entrada') {
+      const urlCompleta = urlDeSesion(aulaId, tipo);
       navigator.clipboard.writeText(urlCompleta)
-        .then(() => mostrarMensaje('URL copiada al portapapeles', 'success'))
+        .then(() => mostrarMensaje(`URL de ${tipo} copiada al portapapeles`, 'success'))
         .catch(()  => mostrarMensaje('No se pudo copiar la URL', 'error'));
     }
 
@@ -378,26 +399,42 @@
       const aula = aulas[aulaId];
       const registrosHoyObj = (asistencias[aulaId] && asistencias[aulaId][fechaKey]) || {};
       
-      // Aplanar la estructura anidada
-      let registros = [];
+      // Unificar entrada y salida por alumno
+      let alumnosUnificados = {};
       Object.keys(registrosHoyObj).forEach(numeroControl => {
         const tiposRegistro = registrosHoyObj[numeroControl];
-        Object.keys(tiposRegistro).forEach(tipo => {
-          const registro = tiposRegistro[tipo];
-          if (typeof registro === 'object') {
-            registros.push(registro);
-          }
-        });
+        
+        if (!alumnosUnificados[numeroControl]) {
+          alumnosUnificados[numeroControl] = {
+            numeroControl: numeroControl,
+            nombre: '',
+            fecha: fechaKey,
+            horaEntrada: '',
+            horaSalida: ''
+          };
+        }
+        
+        if (tiposRegistro.entrada) {
+          alumnosUnificados[numeroControl].nombre = tiposRegistro.entrada.nombre || 'Sin nombre';
+          alumnosUnificados[numeroControl].horaEntrada = tiposRegistro.entrada.hora || '';
+        }
+        
+        if (tiposRegistro.salida) {
+          alumnosUnificados[numeroControl].nombre = tiposRegistro.salida.nombre || alumnosUnificados[numeroControl].nombre;
+          alumnosUnificados[numeroControl].horaSalida = tiposRegistro.salida.hora || '';
+        }
       });
+      
+      const registros = Object.values(alumnosUnificados);
       
       if (registros.length === 0) { 
         mostrarMensaje('No hay registros para exportar', 'error'); 
         return; 
       }
 
-      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora,Tipo\n';
+      let csv = '\uFEFFNúmero de Control,Nombre,Fecha,Hora Entrada,Hora Salida\n';
       registros.forEach(r => { 
-        csv += `${r.numeroControl || ''},"${r.nombre || 'Sin nombre'}",${r.fecha || ''},${r.hora || ''},${r.tipo || 'entrada'}\n`; 
+        csv += `${r.numeroControl || ''},"${r.nombre || 'Sin nombre'}",${r.fecha || ''},${r.horaEntrada || '--:--'},${r.horaSalida || '--:--'}\n`; 
       });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -426,19 +463,33 @@
         const alumnosAula = Object.values((alumnosRegistrados && alumnosRegistrados[aula.id]) || {});
         const registrosHoyObj = (asistencias[aula.id] && asistencias[aula.id][fechaKey]) || {};
         
-        // Procesar registros de hoy - aplanar la estructura anidada
-        let registrosHoy = [];
+        // Unificar registros por alumno
+        let alumnosUnificados = {};
         Object.keys(registrosHoyObj).forEach(numeroControl => {
           const tiposRegistro = registrosHoyObj[numeroControl];
-          Object.keys(tiposRegistro).forEach(tipo => {
-            const registros = tiposRegistro[tipo];
-            if (typeof registros === 'object') {
-              registrosHoy.push(registros);
-            }
-          });
+          
+          if (!alumnosUnificados[numeroControl]) {
+            alumnosUnificados[numeroControl] = {
+              numeroControl: numeroControl,
+              nombre: '',
+              horaEntrada: '',
+              horaSalida: ''
+            };
+          }
+          
+          if (tiposRegistro.entrada) {
+            alumnosUnificados[numeroControl].nombre = tiposRegistro.entrada.nombre || 'Sin nombre';
+            alumnosUnificados[numeroControl].horaEntrada = tiposRegistro.entrada.hora || '';
+          }
+          
+          if (tiposRegistro.salida) {
+            alumnosUnificados[numeroControl].nombre = tiposRegistro.salida.nombre || alumnosUnificados[numeroControl].nombre;
+            alumnosUnificados[numeroControl].horaSalida = tiposRegistro.salida.hora || '';
+          }
         });
 
-        const ultimos = registrosHoy.slice(-5).reverse();
+        const registrosUnificados = Object.values(alumnosUnificados);
+        const ultimos = registrosUnificados.slice(-5).reverse();
 
         return `
           <div class="card-glass rounded-3xl shadow-xl p-4 sm:p-6 relative hover-lift animate-fade-in" style="animation-delay: ${index * 0.05}s">
@@ -448,39 +499,79 @@
               </svg>
             </button>
             <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 pr-10">${aula.nombre}</h3>
+            
+            <!-- QR de Entrada -->
             <div class="qr-container rounded-2xl p-4 sm:p-6 mb-4 shadow-inner">
-                        <div id="qr-${aula.id}" class="mx-auto mb-3 flex items-center justify-center"></div>
-              <p class="text-center text-xs text-gray-600 font-semibold mb-2">Los alumnos escanean este QR</p>
-              <button onclick="copiarURL('${aula.id}')" class="w-full bg-white text-indigo-600 py-2 px-3 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+                </svg>
+                <p class="text-center text-sm font-bold text-green-700">QR de Entrada</p>
+              </div>
+              <div id="qr-entrada-${aula.id}" class="mx-auto mb-3 flex items-center justify-center"></div>
+              <button onclick="copiarURL('${aula.id}', 'entrada')" class="w-full bg-green-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-green-700 transition-all flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
-                Copiar URL
+                Copiar URL Entrada
               </button>
             </div>
+
+            <!-- QR de Salida -->
+            <div class="qr-salida rounded-2xl p-4 sm:p-6 mb-4 shadow-inner">
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                <p class="text-center text-sm font-bold text-red-700">QR de Salida</p>
+              </div>
+              <div id="qr-salida-${aula.id}" class="mx-auto mb-3 flex items-center justify-center"></div>
+              <button onclick="copiarURL('${aula.id}', 'salida')" class="w-full bg-red-600 text-white py-2 px-3 rounded-lg font-bold text-sm hover:bg-red-700 transition-all flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                Copiar URL Salida
+              </button>
+            </div>
+
             <div class="grid grid-cols-2 gap-3 mb-4">
               <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
                 <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Alumnos</p>
                 <p class="text-2xl sm:text-3xl font-bold">${alumnosAula.length}</p>
               </div>
               <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-3 sm:p-4 text-center text-white shadow-lg">
-                <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Hoy</p>
-                <p class="text-2xl sm:text-3xl font-bold">${registrosHoy.length}</p>
+                <p class="text-xs sm:text-sm font-semibold mb-1 opacity-90">Registros Hoy</p>
+                <p class="text-2xl sm:text-3xl font-bold">${registrosUnificados.length}</p>
               </div>
             </div>
-            ${registrosHoy.length > 0 ? `
+            ${registrosUnificados.length > 0 ? `
               <div class="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border border-green-200">
                 <p class="font-bold text-gray-700 mb-2 text-sm sm:text-base flex items-center gap-2">
                   <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
-                  Últimas asistencias:
+                  Últimos registros:
                 </p>
                 <div class="space-y-2 max-h-32 overflow-y-auto">
                   ${ultimos.map(reg => `
-                    <div class="flex justify-between text-xs sm:text-sm bg-white rounded-lg p-2 shadow-sm">
-                      <span class="font-semibold text-gray-800">${reg.nombre || 'Sin nombre'}</span>
-                      <span class="text-gray-600">${reg.hora || '--:--'}</span>
+                    <div class="bg-white rounded-lg p-2 shadow-sm">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="font-semibold text-gray-800 text-xs sm:text-sm">${reg.nombre || 'Sin nombre'}</span>
+                      </div>
+                      <div class="flex gap-3 text-xs">
+                        <span class="flex items-center gap-1 ${reg.horaEntrada ? 'text-green-600' : 'text-gray-400'}">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+                          </svg>
+                          ${reg.horaEntrada || '--:--'}
+                        </span>
+                        <span class="flex items-center gap-1 ${reg.horaSalida ? 'text-red-600' : 'text-gray-400'}">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                          </svg>
+                          ${reg.horaSalida || '--:--'}
+                        </span>
+                      </div>
                     </div>
                   `).join('')}
                 </div>
@@ -507,8 +598,10 @@
       // Generar QR después de insertar HTML
       setTimeout(() => {
         aulasArray.forEach(aula => {
-          const div = document.getElementById(`qr-${aula.id}`);
-          if (div) renderQR(div, urlDeSesion(aula.id));
+          const divEntrada = document.getElementById(`qr-entrada-${aula.id}`);
+          const divSalida = document.getElementById(`qr-salida-${aula.id}`);
+          if (divEntrada) renderQR(divEntrada, urlDeSesion(aula.id, 'entrada'));
+          if (divSalida) renderQR(divSalida, urlDeSesion(aula.id, 'salida'));
         });
       }, 100);
     }
