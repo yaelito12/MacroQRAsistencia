@@ -14,8 +14,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
-  <!-- QR -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- QR - Versión actualizada y confiable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.js"></script>
 
   <style>
     * { font-family: 'Poppins', sans-serif; }
@@ -602,33 +602,59 @@
       }).join('');
 
       console.log('✅ HTML renderizado, generando QRs...');
+      console.log('🔢 Cantidad de aulas a procesar:', aulasArray.length);
       
-      // Generar QR inmediatamente después de que el HTML esté en el DOM
-      setTimeout(() => {
+      // Forzar un repaint del navegador antes de generar QRs
+      container.offsetHeight; // Force reflow
+      
+      // Generar QR con múltiples intentos
+      const intentarGenerarQRs = (intento = 1) => {
+        console.log(`\n⏰ Intento ${intento} de generar QRs...`);
+        
+        let todosGenerados = true;
+        
         aulasArray.forEach(aula => {
+          console.log(`\n📦 Procesando aula: ${aula.nombre} (${aula.id})`);
+          
           const divEntrada = document.getElementById(`qr-entrada-${aula.id}`);
           const divSalida = document.getElementById(`qr-salida-${aula.id}`);
           
-          console.log(`🔍 Generando QR para aula: ${aula.nombre} (${aula.id})`);
+          console.log(`  🔍 divEntrada:`, divEntrada);
+          console.log(`  🔍 divSalida:`, divSalida);
           
-          if (divEntrada) {
-            const urlEntrada = urlDeSesion(aula.id, 'entrada');
-            console.log(`  ✅ Generando QR Entrada: ${urlEntrada}`);
-            renderQR(divEntrada, urlEntrada);
-          } else {
-            console.error(`  ❌ No se encontró div entrada para aula: ${aula.id}`);
+          if (!divEntrada || !divSalida) {
+            todosGenerados = false;
+            console.warn(`  ⚠️ Divs no encontrados aún para aula ${aula.id}`);
           }
           
-          if (divSalida) {
+          if (divEntrada && divEntrada.children.length === 0) {
+            const urlEntrada = urlDeSesion(aula.id, 'entrada');
+            console.log(`  📱 Generando QR Entrada:`, urlEntrada);
+            renderQR(divEntrada, urlEntrada);
+          } else if (divEntrada) {
+            console.log(`  ✅ QR Entrada ya existe`);
+          }
+          
+          if (divSalida && divSalida.children.length === 0) {
             const urlSalida = urlDeSesion(aula.id, 'salida');
-            console.log(`  ✅ Generando QR Salida: ${urlSalida}`);
+            console.log(`  📱 Generando QR Salida:`, urlSalida);
             renderQR(divSalida, urlSalida);
-          } else {
-            console.error(`  ❌ No se encontró div salida para aula: ${aula.id}`);
+          } else if (divSalida) {
+            console.log(`  ✅ QR Salida ya existe`);
           }
         });
-        console.log('🎉 Todos los QRs generados');
-      }, 300);
+        
+        // Si no se generaron todos y es el primer intento, intentar de nuevo
+        if (!todosGenerados && intento < 3) {
+          console.log(`⚠️ No todos los divs encontrados, reintentando en 200ms...`);
+          setTimeout(() => intentarGenerarQRs(intento + 1), 200);
+        } else {
+          console.log('\n🎉 Proceso de generación de QRs completado');
+        }
+      };
+      
+      // Primer intento inmediato
+      setTimeout(() => intentarGenerarQRs(), 100);
     }
 
     function eliminarAula(aulaId) {
