@@ -222,15 +222,37 @@
     }
 
     function renderQR(div, dataUrl){
-      div.innerHTML = '';
-      new QRCode(div, { 
-        text: dataUrl, 
-        width: 200, 
-        height: 200, 
-        colorDark: "#000000", 
-        colorLight: "#ffffff", 
-        correctLevel: QRCode.CorrectLevel.H 
-      });
+      console.log('🔷 renderQR() llamado');
+      console.log('  - div:', div);
+      console.log('  - dataUrl:', dataUrl);
+      console.log('  - QRCode disponible:', typeof QRCode);
+      
+      if (!div) {
+        console.error('❌ Div no encontrado para renderizar QR');
+        return;
+      }
+      
+      if (typeof QRCode === 'undefined') {
+        console.error('❌ Librería QRCode no está cargada');
+        div.innerHTML = '<p class="text-red-500 text-xs p-2">Error: QRCode no disponible</p>';
+        return;
+      }
+      
+      try {
+        div.innerHTML = '';
+        const qr = new QRCode(div, { 
+          text: dataUrl, 
+          width: 150, 
+          height: 150, 
+          colorDark: "#000000", 
+          colorLight: "#ffffff", 
+          correctLevel: QRCode.CorrectLevel.H 
+        });
+        console.log('✅ QR generado exitosamente:', qr);
+      } catch (error) {
+        console.error('❌ Error al generar QR:', error);
+        div.innerHTML = `<p class="text-red-500 text-xs p-2">Error: ${error.message}</p>`;
+      }
     }
 
     function validarNumeroControl(num) { return /^\d{8}$/.test(num); }
