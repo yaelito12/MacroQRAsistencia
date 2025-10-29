@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -670,26 +669,40 @@
       console.log('🔄 Inicializando listeners para usuario:', currentUID);
       
       // Filtrar aulas por usuario autenticado
-      database.ref('aulas').on('value', (s) => {
-        const todasLasAulas = s.val() || {};
-        console.log('📚 Firebase: Aulas recibidas del servidor');
+      const aulasRef = database.ref('aulas');
+      console.log('🔗 Creando listener en:', aulasRef.toString());
+      
+      aulasRef.on('value', (snapshot) => {
+        console.log('🔥 LISTENER DISPARADO - Firebase envió datos');
+        const todasLasAulas = snapshot.val() || {};
+        console.log('📚 Firebase: Aulas recibidas del servidor:', todasLasAulas);
         console.log('📚 Cantidad total de aulas en Firebase:', Object.keys(todasLasAulas).length);
         
         // Filtrar solo las aulas creadas por el usuario actual
         const aulasNuevas = {};
         Object.keys(todasLasAulas).forEach(key => {
+          console.log(`🔍 Revisando aula: ${key}`);
+          console.log(`   - Nombre: ${todasLasAulas[key].nombre}`);
+          console.log(`   - CreadoPor: ${todasLasAulas[key].creadoPor}`);
+          console.log(`   - CurrentUID: ${currentUID}`);
+          console.log(`   - ¿Coincide?: ${todasLasAulas[key].creadoPor === currentUID}`);
+          
           if (todasLasAulas[key].creadoPor === currentUID) {
             aulasNuevas[key] = todasLasAulas[key];
-            console.log('✅ Aula del usuario encontrada:', key, todasLasAulas[key].nombre);
+            console.log('✅ Aula agregada:', key, todasLasAulas[key].nombre);
+          } else {
+            console.log('❌ Aula ignorada (otro usuario)');
           }
         });
         
         aulas = aulasNuevas;
-        console.log('🎯 Total aulas filtradas:', Object.keys(aulas).length);
-        console.log('🎯 Objeto aulas:', aulas);
+        console.log('🎯 Total aulas filtradas para este usuario:', Object.keys(aulas).length);
+        console.log('🎯 Objeto aulas completo:', aulas);
         
         console.log('🎨 Llamando a renderizarAulas()...');
         renderizarAulas();
+      }, (error) => {
+        console.error('❌ Error en listener de aulas:', error);
       });
       
       database.ref('alumnos').on('value', (s) => {
@@ -701,7 +714,8 @@
         asistencias = s.val() || {}; 
       });
       
-      console.log('✅ Listeners inicializados correctamente');
+      console.log('✅ Listeners registrados correctamente');
+      console.log('⏳ Esperando datos de Firebase...');
     }
     
     console.log('✅ Sistema inicializado correctamente');
