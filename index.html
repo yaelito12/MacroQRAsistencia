@@ -609,18 +609,27 @@ function copiarURL(aulaId, tipo = 'entrada') {
       // Filtrar aulas por usuario autenticado
       database.ref('aulas').on('value', (s) => {
         const todasLasAulas = s.val() || {};
-        console.log('📚 Todas las aulas:', todasLasAulas);
+        console.log('📚 Todas las aulas recibidas:', todasLasAulas);
+        console.log('📚 Cantidad total de aulas:', Object.keys(todasLasAulas).length);
         
         // Filtrar solo las aulas creadas por el usuario actual
         aulas = {};
         Object.keys(todasLasAulas).forEach(key => {
+          console.log(`🔍 Revisando aula ${key}:`, todasLasAulas[key]);
+          console.log(`  - creadoPor: ${todasLasAulas[key].creadoPor}`);
+          console.log(`  - currentUID: ${currentUID}`);
+          console.log(`  - ¿Coincide?: ${todasLasAulas[key].creadoPor === currentUID}`);
+          
           if (todasLasAulas[key].creadoPor === currentUID) {
             aulas[key] = todasLasAulas[key];
-            console.log('✅ Aula del usuario:', key, todasLasAulas[key]);
+            console.log('✅ Aula agregada al filtro:', key, todasLasAulas[key]);
+          } else {
+            console.log('❌ Aula NO agregada (diferente usuario)');
           }
         });
         
-        console.log('🎯 Aulas filtradas:', Object.keys(aulas).length);
+        console.log('🎯 Aulas filtradas para este usuario:', Object.keys(aulas).length);
+        console.log('🎯 Aulas objeto:', aulas);
         renderizarAulas();
       });
       
