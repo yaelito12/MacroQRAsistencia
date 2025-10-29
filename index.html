@@ -305,6 +305,11 @@
         mostrarMensaje('Error al crear el aula: ' + (error.message || error), 'error');
       }
     }
+    // IMPORTANTE: Conectar el botón con la función
+    $('btnNuevaAula').addEventListener('click', () => {
+      console.log('🟢 Botón Nueva Aula presionado');
+      crearAula();
+    });
 
     /* ==== Alumnos (modal) ==== */
     function abrirModalAlumnos(aulaId) {
