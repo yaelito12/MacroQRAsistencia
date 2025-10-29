@@ -9,15 +9,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 
-<!-- Estilos -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-
   <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
 
   <style>
     * { font-family: 'Poppins', sans-serif; }
@@ -176,7 +171,7 @@
     /* ==== Estado de la página ==== */
     let aulaId = null;
     let aulaInfo = null;
-    let tipoRegistro = 'entrada'; // 'entrada' o 'salida'
+    let tipoRegistro = 'entrada';
 
     async function cargarInfoAula() {
       aulaId = obtenerParametroURL('aula');
@@ -191,7 +186,6 @@
         return;
       }
 
-      // Actualizar UI según el tipo
       actualizarUITipo();
 
       try {
@@ -226,7 +220,6 @@
       const infoBox = document.getElementById('infoBox');
       
       if (tipoRegistro === 'salida') {
-        // Cambiar a tema rojo para salida
         body.className = 'gradient-bg-salida min-h-screen py-8 px-4';
         iconContainer.className = 'bg-gradient-to-br from-red-500 to-pink-600 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl animate-pulse-slow';
         iconContainer.innerHTML = `
@@ -253,13 +246,9 @@
             <span>Ingresa tu número de control para registrar tu salida. Asegúrate de haber registrado tu entrada primero.</span>
           </p>
         `;
-      } else {
-        // Mantener tema verde para entrada (por defecto)
-        btnTexto.textContent = 'Registrar Entrada';
       }
     }
 
-    /* ==== Validación input en tiempo real ==== */
     document.getElementById('numeroControl').addEventListener('input', function () {
       this.value = this.value.replace(/\D/g, '').substring(0, 8);
       const errorMsg = document.getElementById('errorNumControl');
@@ -288,19 +277,31 @@
       if (!aulaId) return mostrarMensaje('❌ Código de aula no válido', 'error');
 
       try {
-        // Asegurar autenticación
         if (!auth.currentUser) {
           await auth.signInAnonymously();
         }
 
-        // 1) Asegurar que el aula existe
+        // 1) Verificar que el aula existe
         const aulaSnap = await database.ref('aulas/' + aulaId).get();
         if (!aulaSnap.exists()) return mostrarMensaje('❌ Aula no encontrada', 'error');
 
-        // 2) Leer SOLO el nodo del alumno
-        const alumnoSnap = await database.ref('alumnos/' + aulaId + '/' + numeroControl).get();
+        // 2) IMPORTANTE: Buscar el alumno y obtener su nombre
+        const alumnoRef = database.ref('alumnos/' + aulaId + '/' + numeroControl);
+        const alumnoSnap = await alumnoRef.get();
+        
+        console.log('🔍 Buscando alumno en:', `alumnos/${aulaId}/${numeroControl}`);
+        console.log('📊 Snapshot exists:', alumnoSnap.exists());
+        console.log('📊 Snapshot val:', alumnoSnap.val());
+        
+        if (!alumnoSnap.exists()) {
+          return mostrarMensaje('❌ No estás registrado en esta clase. Contacta a tu profesor.', 'error');
+        }
+
         const alumno = alumnoSnap.val();
-        if (!alumno) return mostrarMensaje('❌ No estás registrado en esta clase. Contacta a tu profesor.', 'error');
+        const nombreAlumno = alumno.nombre || 'Sin nombre';
+        
+        console.log('✅ Alumno encontrado:', alumno);
+        console.log('✅ Nombre:', nombreAlumno);
 
         // 3) Vincular dispositivo
         const deviceId = getDeviceId();
@@ -315,31 +316,31 @@
           await dispRef.set(deviceId);
         }
 
-        // 4) Asistencia por fecha + numeroControl + tipo
+        // 4) Registrar asistencia
         const ahora = new Date();
         const fechaKey = ahora.toLocaleDateString('es-MX').split('/').reverse().join('');
-        
-        // Guardar en estructura: asistencias/aulaId/fechaKey/numeroControl/tipo
         const refRegistro = database.ref(`asistencias/${aulaId}/${fechaKey}/${numeroControl}/${tipoRegistro}`);
 
-        // Verificar si ya registró este tipo hoy
         if ((await refRegistro.get()).exists()) {
           const textoTipo = tipoRegistro === 'salida' ? 'salida' : 'entrada';
           return mostrarMensaje(`ℹ️ Ya registraste tu ${textoTipo} hoy en esta clase`, 'error');
         }
 
         const registro = {
-          numeroControl,
-          nombre: alumno.nombre,
+          numeroControl: numeroControl,
+          nombre: nombreAlumno,
           fecha: fechaKey,
           hora: ahora.toLocaleTimeString('es-MX'),
           aula: aulaInfo?.nombre || '',
           dispositivo: deviceId,
           tipo: tipoRegistro
         };
+        
+        console.log('💾 Guardando registro:', registro);
         await refRegistro.set(registro);
+        console.log('✅ Registro guardado exitosamente');
 
-        // 5) UI éxito
+        // 5) Mostrar éxito
         document.getElementById('formulario').classList.add('hidden');
         document.getElementById('exitoMensaje').classList.remove('hidden');
         
@@ -356,11 +357,11 @@
           `;
           exitoTitulo.textContent = '¡Hasta Pronto!';
           exitoDescripcion.textContent = 'Tu salida ha sido registrada exitosamente';
-          document.getElementById('nombreExito').textContent = `Hasta pronto, ${alumno.nombre}`;
-          mostrarMensaje(`👋 ¡Hasta pronto ${alumno.nombre}!`, 'success');
+          document.getElementById('nombreExito').textContent = `Hasta pronto, ${nombreAlumno}`;
+          mostrarMensaje(`👋 ¡Hasta pronto ${nombreAlumno}!`, 'success');
         } else {
-          document.getElementById('nombreExito').textContent = `Bienvenido(a), ${alumno.nombre}`;
-          mostrarMensaje(`🎉 ¡Bienvenido ${alumno.nombre}!`, 'success');
+          document.getElementById('nombreExito').textContent = `Bienvenido(a), ${nombreAlumno}`;
+          mostrarMensaje(`🎉 ¡Bienvenido ${nombreAlumno}!`, 'success');
         }
       } catch (error) {
         console.error('❌ Error al registrar:', error);
