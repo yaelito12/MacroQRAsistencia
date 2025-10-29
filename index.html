@@ -297,7 +297,7 @@ function urlDeSesion(aulaId, tipo = 'entrada'){
           creadoEn: Date.now()
         };
 
-          console.log('📤 Guardando aula:', payload);
+         console.log('📤 Guardando aula:', payload);
         await refAula.set(payload);
         // NO inicializar alumnos manualmente - se creará automáticamente al agregar el primer alumno
         mostrarMensaje('Aula creada exitosamente', 'success');
@@ -602,31 +602,41 @@ function copiarURL(aulaId, tipo = 'entrada') {
     window.exportarExcel = exportarExcel;
     window.eliminarAula = eliminarAula;
 
-    /* ==== Subscripciones DB ==== */
- /* ==== Subscripciones DB ==== */
-    // Filtrar aulas por usuario autenticado
-    database.ref('aulas').on('value', (s) => {
-      const todasLasAulas = s.val() || {};
-      // Filtrar solo las aulas creadas por el usuario actual
-      aulas = {};
-      Object.keys(todasLasAulas).forEach(key => {
-        if (todasLasAulas[key].creadoPor === currentUID) {
-          aulas[key] = todasLasAulas[key];
-        }
+  /* ==== Subscripciones DB ==== */
+    function inicializarListeners() {
+      console.log('🔄 Inicializando listeners para usuario:', currentUID);
+      
+      // Filtrar aulas por usuario autenticado
+      database.ref('aulas').on('value', (s) => {
+        const todasLasAulas = s.val() || {};
+        console.log('📚 Todas las aulas:', todasLasAulas);
+        
+        // Filtrar solo las aulas creadas por el usuario actual
+        aulas = {};
+        Object.keys(todasLasAulas).forEach(key => {
+          if (todasLasAulas[key].creadoPor === currentUID) {
+            aulas[key] = todasLasAulas[key];
+            console.log('✅ Aula del usuario:', key, todasLasAulas[key]);
+          }
+        });
+        
+        console.log('🎯 Aulas filtradas:', Object.keys(aulas).length);
+        renderizarAulas();
       });
-      renderizarAulas();
-    });
-    
-    database.ref('alumnos').on('value', (s) => {
-      alumnosRegistrados = s.val() || {};
-      if (aulaSeleccionada) renderizarAlumnos();
-      renderizarAulas();
-    });
-    
-    database.ref('asistencias').on('value', (s) => { 
-      asistencias = s.val() || {}; 
-      renderizarAulas(); 
-    });
+      
+      database.ref('alumnos').on('value', (s) => {
+        alumnosRegistrados = s.val() || {};
+        if (aulaSeleccionada) renderizarAlumnos();
+        renderizarAulas();
+      });
+      
+      database.ref('asistencias').on('value', (s) => { 
+        asistencias = s.val() || {}; 
+        renderizarAulas(); 
+      });
+      
+      console.log('✅ Listeners inicializados correctamente');
+    }
     
     console.log('✅ Sistema inicializado correctamente');
   </script>
